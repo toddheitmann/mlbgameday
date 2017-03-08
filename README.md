@@ -1,6 +1,6 @@
 # mlbgameday
 
-A python wrapper for MLBAM gameday data. Stores data using [SQLAlchemy](https://www.sqlalchemy.org). Returns data in [PANDAS](http://pandas.pydata.org) data frames. Data use is always subject to [MLB Advanced Media License](http://gd2.mlb.com/components/copyright.txt) as well as the project license.
+A python wrapper for MLBAM gameday data. Stores data using [SQLAlchemy](https://www.sqlalchemy.org). Returns data in [PANDAS](http://pandas.pydata.org) data frames. Data use is always subject to [MLB Advanced Media License](http://gd2.mlb.com/components/copyright.txt) as well as the [project license](https://github.com/toddheitmann/mlbgameday/blob/master/LICENSE).
 
 ## Status
 
@@ -10,7 +10,7 @@ This currently ***does not*** work. If you're curious about using MLBAM gameday 
 
 The project has two simple main goals:
 
-- Provide a simple db storage for gameday information using [SQLAlchemy](https://www.sqlalchemy.org) in sqlite format.
+- Provide a simple database storage for gameday information using [SQLAlchemy](https://www.sqlalchemy.org) in sqlite format.
 - Serve this data back in [PANDAS](http://pandas.pydata.org) dataframes for further analysis.
 
 ### Roadmap
