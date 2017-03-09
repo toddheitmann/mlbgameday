@@ -23,19 +23,6 @@ def get_games(game_date):
             games.append(game_info)
     return games
 
-def get_gids(game_date):
-    """Returns all gid for a date"""
-    data = dl.download_miniscoreboard(game_date)
-    root = ET.fromstring(data)
-    gids = []
-    for game in root:
-        if game.tag == 'game':
-            if 'id' in game.attrib:
-                gid = game.attrib['id']
-                gid = gid.replace('/','_').replace('-','_')
-                gids.append(gid)
-    return gids
-
 def get_players(gid):
     """Returns all players for a gid"""
     data = dl.download_gid_file(gid, 'players.xml')
