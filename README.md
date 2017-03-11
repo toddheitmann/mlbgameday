@@ -1,6 +1,8 @@
-# mlbgameday
+# MLBGame Data
 
-A python wrapper for MLBAM gameday data. Stores data using [SQLAlchemy](https://www.sqlalchemy.org). Returns data in [PANDAS](http://pandas.pydata.org) data frames. Data use is always subject to [MLB Advanced Media License](http://gd2.mlb.com/components/copyright.txt) as well as the [project license](https://github.com/toddheitmann/mlbgameday/blob/master/LICENSE).
+A python API for MLB data working with data from MLBAM Gameday [data](http://gd2.mlb.com/components/game/mlb/) and [Baseball Savant](https://baseballsavant.mlb.com). Stores data using [SQLAlchemy](https://www.sqlalchemy.org). Returns data in [PANDAS](http://pandas.pydata.org) data frames.
+
+Data use is always subject to licenses by [MLB Advanced Media License](http://gd2.mlb.com/components/copyright.txt) and the [project license](https://github.com/toddheitmann/mlbgameday/blob/master/LICENSE).
 
 ## Status
 
@@ -10,18 +12,26 @@ This currently ***does not*** work. If you're curious about using MLBAM gameday 
 
 The project has two simple main goals:
 
-- Provide a simple database storage for gameday information using [SQLAlchemy](https://www.sqlalchemy.org) in sqlite format.
+- Provide a database storage for gameday information using [SQLAlchemy](https://www.sqlalchemy.org) in sqlite format.
 - Serve this data back in [PANDAS](http://pandas.pydata.org) dataframes for further analysis.
 
 ### Roadmap
 
-Right now, I see three main paths to bring this project online, reading xml data, creating the database structure, and serving filters in dataframes:
+Right now, I see three main paths to bring this project online, reading and storing downloaded data, creating the database structure, and serving queries in dataframes:
 
-- [ ] Using XML data
+- [ ] Using Gameday XML data
 
   - [ ] Store and Parse XML files
 
   - [ ] Update XML files
+
+  - [ ] Option to delete files after inserting into a database
+
+- [ ] Using Baseball Savant data
+
+  - [ ] Store and Parse CSV files
+
+  - [ ] Update CSV files
 
   - [ ] Option to delete files after inserting into a database
 

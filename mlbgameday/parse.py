@@ -3,28 +3,32 @@ This module parses individual game data from mlbgameday, which is subject to the
 http://gd2.mlb.com/components/copyright.txt
 """
 
-import os
+import gzip
+from os import listdir
+from os.path import isfile, join, dirname
 import datetime as dt
 import xml.etree.ElementTree as ET
+import pandas as pd
+
+try:
+    from io import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 import download as dl
 
-def get_games(game_date):
-    """Returns general game data for a date"""
-    data = dl.download_miniscoreboard(game_date)
-    root = ET.fromstring(data)
-    games = []
-    for game in root:
-        if game.tag == 'game':
-            game_info = {}
-            for attr in game.attrib:
-                if 'link' not in attr:
-                    game_info[attr] = game.attrib[attr]
-            games.append(game_info)
-    return games
-
-def get_players(gid):
-    """Returns all players for a gid"""
+def get_players(game):
+    """Returns all players for a game dictonary"""
+    if 'gid' in game:
+        gid = game['gid']
+    else:
+        print('No gid for game')
+        print(game)
+        raise ValueError('gid key required for get_players')
+    if 'game_pk' in game:
+        game_pk = game['game_pk']
+    else:
+        game_pk = ''
     data = dl.download_gid_file(gid, 'players.xml')
     root = ET.fromstring(data)
     players = []
@@ -36,14 +40,24 @@ def get_players(gid):
                 home_flag = 0
             player_nodes = elem.findall('player')
             for person in player_nodes:
-                player = {'gid': gid, 'home_flag': home_flag}
+                player = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag}
                 for attr in person.attrib:
                     player[attr] = person.attrib[attr]
                 players.append(player)
     return players
 
-def get_coaches(gid):
-    """Returns all coaches for a gid"""
+def get_coaches(game):
+    """Returns all coaches for a game dictionary"""
+    if 'gid' in game:
+        gid = game['gid']
+    else:
+        print('No gid for game')
+        print(game)
+        raise ValueError('gid key required for get_coaches')
+    if 'game_pk' in game:
+        game_pk = game['game_pk']
+    else:
+        game_pk = ''
     data = dl.download_gid_file(gid, 'players.xml')
     root = ET.fromstring(data)
     coaches = []
@@ -55,140 +69,227 @@ def get_coaches(gid):
                 home_flag = 0
             coach_nodes = elem.findall('coach')
             for person in coach_nodes:
-                coach = {'gid': gid, 'home_flag': home_flag}
+                coach = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag}
                 for attr in person.attrib:
                     coach[attr] = person.attrib[attr]
                 coaches.append(coach)
     return coaches
 
-def get_umpires(gid):
-    """Returns all umpires for a gid"""
+def get_umpires(game):
+    """Returns all umpires for a game dictionary"""
+    if 'gid' in game:
+        gid = game['gid']
+    else:
+        print('No gid for game')
+        print(game)
+        raise ValueError('gid key required for get_umpires')
+    if 'game_pk' in game:
+        game_pk = game['game_pk']
+    else:
+        game_pk = ''
     data = dl.download_gid_file(gid, 'players.xml')
     root = ET.fromstring(data)
     umpires = []
     umpire_nodes = root.find('umpires').findall('umpire')
     for person in umpire_nodes:
-        umpire = {'gid': gid}
+        umpire = {'gid': gid, 'game_pk': game_pk}
         for attr in person.attrib:
             umpire[attr] = person.attrib[attr]
         umpires.append(umpire)
     return umpires
 
-def get_hip(gid):
-    """Returns hip points for gid"""
+def get_hip(game):
+    """Returns hip points for a game dictionary"""
+    if 'gid' in game:
+        gid = game['gid']
+    else:
+        print('No gid for game')
+        print(game)
+        raise ValueError('gid key required for get_hip')
+    if 'game_pk' in game:
+        game_pk = game['game_pk']
+    else:
+        game_pk = ''
     data = dl.download_gid_file(gid, 'inning_hip.xml')
     root = ET.fromstring(data)
     hips = []
     hip_nodes = root.findall('hip')
     for node in hip_nodes:
-        hip = {'gid': gid}
+        hip = {'gid': gid, 'game_pk': game_pk}
         for attr in node.attrib:
             hip[attr] = node.attrib[attr]
         hips.append(hip)
     return hips
 
-def get_atbats(gid):
-    """Returns atbats for gid"""
+def get_atbats(game):
+    """Returns atbats for a game dictionary"""
+    if 'gid' in game:
+        gid = game['gid']
+    else:
+        print('No gid for game')
+        print(game)
+        raise ValueError('gid key required for get_atbats')
+    if 'game_pk' in game:
+        game_pk = game['game_pk']
+    else:
+        game_pk = ''
     data = dl.download_gid_file(gid, 'inning_all.xml')
     root = ET.fromstring(data)
     atbats = []
     innings = root.findall('inning')
-    halves = {'top': 0, 'bottom': 1}
+    halves = {'top': 'top', 'bottom': 'bot'}
     for inning in innings:
         inning_number = inning.attrib['num']
         for half in halves:
-            home_flag = halves[half]
-            atbat_nodes = inning.find(half).findall('atbat')
-            for node in atbat_nodes:
-                atbat = {'gid': gid, 'home_flag': home_flag, 'inning': inning_number}
-                for attr in node.attrib:
-                    atbat[attr] = node.attrib[attr]
-                atbats.append(atbat)
+            inning_topbot = halves[half]
+            inning_node = inning.find(half)
+            if inning_node is not None:
+                atbat_nodes = inning_node.findall('atbat')
+                for node in atbat_nodes:
+                    atbat = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number}
+                    for attr in node.attrib:
+                        atbat[attr] = node.attrib[attr]
+                    atbats.append(atbat)
     return atbats
 
-def get_pitches(gid):
-    """Returns pitches for gid"""
+def get_pitches(game):
+    """Returns pitches for game dictionary"""
+    if 'gid' in game:
+        gid = game['gid']
+    else:
+        print('No gid for game')
+        print(game)
+        raise ValueError('gid key required for get_pitches')
+    if 'game_pk' in game:
+        game_pk = game['game_pk']
+    else:
+        game_pk = ''
     data = dl.download_gid_file(gid, 'inning_all.xml')
     root = ET.fromstring(data)
     pitches = []
     innings = root.findall('inning')
-    halves = {'top': 0, 'bottom': 1}
+    halves = {'top': 'top', 'bottom': 'bot'}
     for inning in innings:
         inning_number = inning.attrib['num']
         for half in halves:
-            home_flag = halves[half]
-            atbat_nodes = inning.find(half).findall('atbat')
-            for bat_node in atbat_nodes:
-                pitch_nodes = bat_node.findall('pitch')
-                bat_num = bat_node.attrib['num']
-                for node in pitch_nodes:
-                    pitch = {'gid': gid, 'home_flag': home_flag, 'inning': inning_number, 'bat_num': bat_num}
-                    for attr in node.attrib:
-                        pitch[attr] = node.attrib[attr]
-                    pitches.append(pitch)
+            inning_topbot = halves[half]
+            inning_node = inning.find(half)
+            if inning_node is not None:
+                atbat_nodes = inning_node.findall('atbat')
+                for bat_node in atbat_nodes:
+                    pitch_nodes = bat_node.findall('pitch')
+                    bat_num = bat_node.attrib['num']
+                    for node in pitch_nodes:
+                        pitch = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'bat_num': bat_num}
+                        for attr in node.attrib:
+                            pitch[attr] = node.attrib[attr]
+                        pitches.append(pitch)
     return pitches
 
-def get_runners(gid):
-    """Returns runners for gid"""
+def get_runners(game):
+    """Returns runners for a game dictionary"""
+    if 'gid' in game:
+        gid = game['gid']
+    else:
+        print('No gid for game')
+        print(game)
+        raise ValueError('gid key required for get_runners')
+    if 'game_pk' in game:
+        game_pk = game['game_pk']
+    else:
+        game_pk = ''
     data = dl.download_gid_file(gid, 'inning_all.xml')
     root = ET.fromstring(data)
     runners = []
     innings = root.findall('inning')
-    halves = {'top': 0, 'bottom': 1}
+    halves = {'top': 'top', 'bottom': 'bot'}
     for inning in innings:
         inning_number = inning.attrib['num']
         for half in halves:
-            home_flag = halves[half]
-            atbat_nodes = inning.find(half).findall('atbat')
-            for bat_node in atbat_nodes:
-                runner_nodes = bat_node.findall('runner')
-                bat_num = bat_node.attrib['num']
-                for node in runner_nodes:
-                    runner = {'gid': gid, 'home_flag': home_flag, 'inning': inning_number, 'bat_num': bat_num}
-                    for attr in node.attrib:
-                        runner[attr] = node.attrib[attr]
-                    runners.append(runner)
+            inning_topbot = halves[half]
+            inning_node = inning.find(half)
+            if inning_node is not None:
+                atbat_nodes = inning_node.findall('atbat')
+                for bat_node in atbat_nodes:
+                    runner_nodes = bat_node.findall('runner')
+                    bat_num = bat_node.attrib['num']
+                    for node in runner_nodes:
+                        runner = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'bat_num': bat_num}
+                        for attr in node.attrib:
+                            runner[attr] = node.attrib[attr]
+                        runners.append(runner)
     return runners
 
-def get_pickoffs(gid):
-    """Returns runners for gid"""
+def get_pickoffs(game):
+    """Returns runners for a game dictionary"""
+    if 'gid' in game:
+        gid = game['gid']
+    else:
+        print('No gid for game')
+        print(game)
+        raise ValueError('gid key required for get_pickoffs')
+    if 'game_pk' in game:
+        game_pk = game['game_pk']
+    else:
+        game_pk = ''
     data = dl.download_gid_file(gid, 'inning_all.xml')
     root = ET.fromstring(data)
     pickoffs = []
     innings = root.findall('inning')
-    halves = {'top': 0, 'bottom': 1}
+    halves = {'top': 'top', 'bottom': 'bot'}
     for inning in innings:
         inning_number = inning.attrib['num']
         for half in halves:
-            home_flag = halves[half]
+            inning_topbot = halves[half]
             atbat_nodes = inning.find(half).findall('atbat')
             for bat_node in atbat_nodes:
                 po_nodes = bat_node.findall('po')
                 bat_num = bat_node.attrib['num']
                 for node in po_nodes:
-                    po = {'gid': gid, 'home_flag': home_flag, 'inning': inning_number, 'bat_num': bat_num}
+                    po = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'bat_num': bat_num}
                     for attr in node.attrib:
                         po[attr] = node.attrib[attr]
                     pickoffs.append(po)
     return pickoffs
 
-def get_actions(gid):
-    """Returns atbats for gid"""
+def get_actions(game):
+    """Returns actions for a game dictionary"""
+    if 'gid' in game:
+        gid = game['gid']
+    else:
+        print('No gid for game')
+        print(game)
+        raise ValueError('gid key required for get_actions')
+    if 'game_pk' in game:
+        game_pk = game['game_pk']
+    else:
+        game_pk = ''
     data = dl.download_gid_file(gid, 'inning_all.xml')
     root = ET.fromstring(data)
     actions = []
     innings = root.findall('inning')
-    halves = {'top': 0, 'bottom': 1}
+    halves = {'top': 'top', 'bottom': 'bot'}
     action_number = 1
     for inning in innings:
         inning_number = inning.attrib['num']
         for half in halves:
-            home_flag = halves[half]
+            inning_topbot = halves[half]
             action_nodes = inning.find(half).findall('action')
             for node in action_nodes:
-                action = {'gid': gid, 'home_flag': home_flag, 'inning': inning_number, 'action_number': action_number}
+                action = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'action_number': action_number}
                 for attr in node.attrib:
                     action[attr] = node.attrib[attr]
                 actions.append(action)
                 action_number += 1
     return actions
+
+def get_trajectory_df(year):
+    files_dir = join(dirname(__file__), 'data/savant', str(year))
+    player_files = [f for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    df = pd.DataFrame()
+    for file_name in player_files:
+        file_path = join(files_dir, file_name)
+        with gzip.open(file_path, 'rt') as f:
+            data = StringIO(f.read())
+        df = df.append(pd.read_csv(data, parse_dates = ['game_date', 'tfs_zulu']))
+    return df
