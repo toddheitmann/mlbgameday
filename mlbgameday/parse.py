@@ -149,42 +149,30 @@ def get_atbats(game):
                     atbat = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number}
                     for attr in node.attrib:
                         atbat[attr] = node.attrib[attr]
+                    atbat = get_child(node, atbat, 'pitch')
+                    atbat = get_child(node, atbat, 'runner')
+                    atbat = get_child(node, atbat, 'po')
                     atbats.append(atbat)
     return atbats
 
-def get_pitches(game):
-    """Returns pitches for game dictionary"""
-    if 'gid' in game:
-        gid = game['gid']
-    else:
-        print('No gid for game')
-        print(game)
-        raise ValueError('gid key required for get_pitches')
-    if 'game_pk' in game:
-        game_pk = game['game_pk']
-    else:
-        game_pk = ''
-    data = dl.download_gid_file(gid, 'inning_all.xml')
-    root = ET.fromstring(data)
-    pitches = []
-    innings = root.findall('inning')
-    halves = {'top': 'top', 'bottom': 'bot'}
-    for inning in innings:
-        inning_number = inning.attrib['num']
-        for half in halves:
-            inning_topbot = halves[half]
-            inning_node = inning.find(half)
-            if inning_node is not None:
-                atbat_nodes = inning_node.findall('atbat')
-                for bat_node in atbat_nodes:
-                    pitch_nodes = bat_node.findall('pitch')
-                    bat_num = bat_node.attrib['num']
-                    for node in pitch_nodes:
-                        pitch = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'bat_num': bat_num}
-                        for attr in node.attrib:
-                            pitch[attr] = node.attrib[attr]
-                        pitches.append(pitch)
-    return pitches
+def get_child(atbat_node, atbat, child_name):
+    """Returns atbat dictionary with pitches for xml node and atbat dictionary"""
+    gid = atbat['gid']
+    game_pk = atbat['game_pk']
+    inning_topbot = atbat['inning_topbot']
+    inning_number = atbat['inning']
+    bat_num = atbat['num']
+    child_nodes = atbat_node.findall(child_name)
+    children = []
+    for child in child_nodes:
+        child_dict = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'bat_num': bat_num}
+        for attr in child.attrib:
+            child_dict[attr] = child.attrib[attr]
+        if 'id' in child_dict:
+            child_dict[child_name + '_id'] = child_dict.pop('id','')
+        children.append(child_dict)
+    atbat[child_name] = children
+    return atbat
 
 def get_runners(game):
     """Returns runners for a game dictionary"""
@@ -274,13 +262,15 @@ def get_actions(game):
         inning_number = inning.attrib['num']
         for half in halves:
             inning_topbot = halves[half]
-            action_nodes = inning.find(half).findall('action')
-            for node in action_nodes:
-                action = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'action_number': action_number}
-                for attr in node.attrib:
-                    action[attr] = node.attrib[attr]
-                actions.append(action)
-                action_number += 1
+            inning_node = inning.find(half)
+            if inning_node is not None:
+                action_nodes = inning_node.findall('action')
+                for node in action_nodes:
+                    action = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'action_number': action_number}
+                    for attr in node.attrib:
+                        action[attr] = node.attrib[attr]
+                    actions.append(action)
+                    action_number += 1
     return actions
 
 def get_trajectory_df(year):

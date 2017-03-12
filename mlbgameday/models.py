@@ -174,7 +174,7 @@ class PitchModel(Base):
     spin_rate = Column(Float)
 
     def __repr__(self):
-        return '<PitchModel(gid = %s, pitch_num = %s, pitch_type = %s)>' % \
+        return '<PitchModel(gid = %s, pitch_num = %i, pitch_type = %s)>' % \
                (self.gid, self.pitch_num, self.pitch_type)
 
 
@@ -186,18 +186,34 @@ class RunnerModel(Base):
     inning_topbot = Column(String(3))
     inning = Column(Integer)
     bat_num = Column(Integer, ForeignKey('atbat.bat_num'))
-    runner_id = Column(Integer)
+    runner_id = Column(Integer, primary_key = True)
     start = Column(String(2))
     end = Column(String(2))
     event = Column(String(10))
-    score = Column(String(1))
-    rbi = Column(String(1))
-    earned = Column(String(1))
+    score = Column(String(1), default = '')
+    rbi = Column(String(1), default = '')
+    earned = Column(String(1), default = '')
+
+    def __repr__(self):
+        return '<RunnerModel(game_pk = %s, gid = %s, des = %s)>' % \
+               (str(self.game_pk), str(self.event_num), str(self.des))
 
 class PickoffModel(Base):
     __tablename__ = 'pickoff'
-    gid = Column(String, primary_key = True, ForeignKey('game.gid'))
-    pickoff_num = Column(Integer, primary_key = True)
+    game_pk = Column(Integer, primary_key = True, ForeignKey('game.game_pk'))
+    gid = Column(String)
+    event_num = Column(Integer, primary_key = True)
+    inning_topbot = Column(String(3))
+    inning = Column(Integer)
+    bat_num = Column(Integer, ForeignKey('atbat.bat_num'))
+    des = Column(String(100))
+    des_es = Column(String(100), default = '')
+    play_guid = Column(String(36), default = '')
+
+    def __repr__(self):
+        return '<PickoffModel(game_pk = %i, gid = %s, event_num = %i, des = %s)>' \
+               % (self.game_pk, self.gid, self.event_num, self.des)
+
 
 class TrajectoryModel(Base):
     __tablename__ = 'trajectory'
@@ -263,8 +279,8 @@ class TrajectoryModel(Base):
     release_extension = Column(Float)
 
     def __repr__(self):
-        return '<TrajectoryModel(game_pk = %s, pitcher = %s, game_date = %s)>' % \
-               (str(self.game_pk), str(self.player_name), str(self.game_date))
+        return '<TrajectoryModel(game_pk = %i, pitcher = %s, game_date = %s)>' % \
+               (self.game_pk, self.player_name, self.game_date.srftime('%Y-%m-%d'))
 
 class Employee(Base):
     __tablename__ = 'employee'

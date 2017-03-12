@@ -118,7 +118,7 @@ def get_games(game_date):
 def update_miniscoreboard(start_date = None, end_date = None):
     """Updates all miniscoreboard XML files from start_date to yesterday"""
     if start_date is None:
-        start_date = dt.date(2009,2,25)
+        start_date = dt.date(2010,1,1)
     if end_date is None:
         end_date = dt.date.today()
     delta = end_date - start_date
@@ -132,7 +132,7 @@ def update_miniscoreboard(start_date = None, end_date = None):
 def update_gid_files(start_date = None, end_date = None):
     """Updates all gid XML files from start_date to yesterday"""
     if start_date is None:
-        start_date = dt.date(2011,9,4)
+        start_date = dt.date(2014,6,22)
     if end_date is None:
         end_date = dt.date.today()
     delta = end_date - start_date
@@ -176,7 +176,6 @@ def download_trajectory_csvs(start_year = None, end_year = None, overwrite = Fal
 
     data = []
     for player_year in players_years:
-        print(player_year)
         player_year = player_year.split('_')
         player_id = player_year[0]
         year = player_year[1]
