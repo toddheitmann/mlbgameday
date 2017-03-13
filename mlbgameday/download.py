@@ -51,8 +51,8 @@ def format_download_file(game_date, file_name, gid = None):
 def download_xml(dir_name, file_name, url):
     """Serves xml files located in the dir_path at file_path or downloads from url"""
     if isfile(file_name + '.gz'):
-         with gzip.open(file_name + '.gz', 'rb') as f:
-             data = f.read()
+        with gzip.open(file_name + '.gz', 'rb') as f:
+            data = f.read()
     else:
         try:
             call = urlopen(url)
@@ -64,17 +64,11 @@ def download_xml(dir_name, file_name, url):
             data = response.decode('utf-8')
             time.sleep(1)
         except HTTPError:
-            # if not exists(dir_name):
-            #     os.makedirs(dir_name)
-            # with gzip.open(file_name + '.gz', 'wb') as f:
-            #     f.write('<games></games>'.encode())
-            error_file = join(dirname(__file__), 'data/download_errors.txt')
-            with open(error_file, 'a+') as f:
-                f.write(url + '\n')
-            print('HTTPError')
-            print(url)
-            data = None
-
+            data = '<games></games>'
+            if not exists(dir_name):
+                os.makedirs(dir_name)
+            with gzip.open(file_name + '.gz', 'wb') as f:
+                f.write(data.encode())
     return data
 
 def download_miniscoreboard(game_date):
@@ -127,12 +121,11 @@ def update_miniscoreboard(start_date = None, end_date = None):
         game_date = start_date + dt.timedelta(d)
         print(game_date)
         download_miniscoreboard(game_date)
-        time.sleep(1)
 
 def update_gid_files(start_date = None, end_date = None):
     """Updates all gid XML files from start_date to yesterday"""
     if start_date is None:
-        start_date = dt.date(2014,6,22)
+        start_date = dt.date(2010,1,1)
     if end_date is None:
         end_date = dt.date.today()
     delta = end_date - start_date
