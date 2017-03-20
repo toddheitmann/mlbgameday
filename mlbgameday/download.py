@@ -219,5 +219,5 @@ def update_all(start_date = None, end_date = None):
     if end_date is not None:
         end_year = end_date.year
     else:
-        end_date = None
-    download_savant_csvs(start_year = start_year, end_year = end_year, overwrite = True)
+        end_year = None
+    download_trajectory_csvs(start_year = start_year, end_year = end_year, overwrite = True)

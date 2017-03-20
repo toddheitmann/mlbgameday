@@ -36,7 +36,7 @@ def parse_attributes(dictionary, xml_node, name):
             elif ' ' not in xml_node.attrib[attr] and \
                  '-' not in xml_node.attrib[attr] and \
                  'null' not in xml_node.attrib[attr] and \
-                 len(x|ml_node.attrib[attr]) > 0:
+                 len(xml_node.attrib[attr]) > 0:
                 dictionary[attr] = int(xml_node.attrib[attr])
             else:
                 dictionary[attr] = None
