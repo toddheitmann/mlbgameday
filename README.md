@@ -21,15 +21,19 @@ Right now, I see three main paths to bring this project online, reading and stor
 
 - [ ] Using Gameday XML data
 
-  - [ ] Store and Parse XML files
+  - [x] Store XML files
 
-  - [ ] Update XML files
+  - [ ] Parse XML files
+
+  - [x] Update XML files
+
+  - [ ] Format XML files for database insertion
 
   - [ ] Option to delete files after inserting into a database
 
 - [ ] Using Baseball Savant data
 
-  - [ ] Store and Parse CSV files
+  - [x] Store and Parse CSV files
 
   - [ ] Update CSV files
 

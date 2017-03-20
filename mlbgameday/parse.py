@@ -1,6 +1,6 @@
 """
-This module parses individual game data from mlbgameday, which is subject to the license at:
-http://gd2.mlb.com/components/copyright.txt
+This module parses individual game data from mlbgameday,
+which is subject to the license at: http://gd2.mlb.com/components/copyright.txt
 """
 
 import gzip
@@ -17,21 +17,47 @@ except ImportError:
 
 import download as dl
 
-def get_players(game):
-    """Returns all players for a game dictonary"""
-    if 'gid' in game:
-        gid = game['gid']
+def parse_attributes(dictionary, xml_node, name):
+    """Adds attributes from xml node to a dictionary"""
+    attr_float = ['avg', 'era']
+    attr_int = ['id', 'game_pk', 'num', 'team_id', 'parent_team_id', 'hr', 'rbi', 'wins', 'losses' #players
+    'event_num', 'home_team_runs', 'away_team_runs','o']
+    for attr in xml_node.attrib:
+        if attr == 'sv_id':
+            dictionary['sv_id'] = dt.datetime.strptime(xml_node.attrib[attr], '%y%m%d_%H%M%S')
+        elif attr in attr_float:
+            if '-' not in xml_node.attrib[attr]:
+                dictionary[attr] = float(xml_node.attrib[attr])
+            else:
+                dictionary[attr] = None
+        elif attr in attr_int:
+            if attr == 'rbi' and name == 'runner':
+                dictionary[attr] = xml_node.attrib[attr]
+            elif ' ' not in xml_node.attrib[attr] and \
+                 '-' not in xml_node.attrib[attr] and \
+                 'null' not in xml_node.attrib[attr] and \
+                 len(x|ml_node.attrib[attr]) > 0:
+                dictionary[attr] = int(xml_node.attrib[attr])
+            else:
+                dictionary[attr] = None
+        else:
+            dictionary[attr] = xml_node.attrib[attr]
+    if 'id' in dictionary:
+        dictionary[name + '_id'] = dictionary.pop('id', None)
+    if name == 'pitch':
+        if 'type' in dictionary:
+            dictionary['p_type'] = dictionary.pop('type', None)
     else:
-        print('No gid for game')
-        print(game)
-        raise ValueError('gid key required for get_players')
-    if 'game_pk' in game:
-        game_pk = game['game_pk']
-    else:
-        game_pk = ''
+        if 'type' in dictionary:
+            dictionary[name + '_type'] = dictionary.pop('type', None)
+    return dictionary
+
+def get_players(gid, game_pk):
     data = dl.download_gid_file(gid, 'players.xml')
     root = ET.fromstring(data)
     players = []
+    coaches = []
+    umpires = []
     for elem in root:
         if elem.tag == 'team':
             if elem.attrib['type'] == 'home':
@@ -39,241 +65,282 @@ def get_players(game):
             else:
                 home_flag = 0
             player_nodes = elem.findall('player')
-            for person in player_nodes:
-                player = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag}
-                for attr in person.attrib:
-                    player[attr] = person.attrib[attr]
-                players.append(player)
-    return players
-
-def get_coaches(game):
-    """Returns all coaches for a game dictionary"""
-    if 'gid' in game:
-        gid = game['gid']
-    else:
-        print('No gid for game')
-        print(game)
-        raise ValueError('gid key required for get_coaches')
-    if 'game_pk' in game:
-        game_pk = game['game_pk']
-    else:
-        game_pk = ''
-    data = dl.download_gid_file(gid, 'players.xml')
-    root = ET.fromstring(data)
-    coaches = []
-    for elem in root:
-        if elem.tag == 'team':
-            if elem.attrib['type'] == 'home':
-                home_flag = 1
-            else:
-                home_flag = 0
+            if player_nodes is not None:
+                for person in player_nodes:
+                    player = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag}
+                    player = parse_attributes(player, person, 'player')
+                    players.append(player)
             coach_nodes = elem.findall('coach')
-            for person in coach_nodes:
-                coach = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag}
-                for attr in person.attrib:
-                    coach[attr] = person.attrib[attr]
-                coaches.append(coach)
-    return coaches
+            if coach_nodes is not None:
+                for person in coach_nodes:
+                    coach = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag}
+                    coach = parse_attributes(coach, person, 'coach')
+                    coaches.append(coach)
+        elif elem.tag == 'umpires':
+            umpire_nodes = elem.findall('umpire')
+            if umpire_nodes is not None:
+                for person in umpire_nodes:
+                    umpire = {'gid': gid, 'game_pk': game_pk}
+                    umpire = parse_attributes(umpire, person, 'umpire')
+                    umpires.append(umpire)
+    return {'players': players, 'coaches': coaches, 'umpires': umpires}
 
-def get_umpires(game):
-    """Returns all umpires for a game dictionary"""
-    if 'gid' in game:
-        gid = game['gid']
-    else:
-        print('No gid for game')
-        print(game)
-        raise ValueError('gid key required for get_umpires')
-    if 'game_pk' in game:
-        game_pk = game['game_pk']
-    else:
-        game_pk = ''
-    data = dl.download_gid_file(gid, 'players.xml')
-    root = ET.fromstring(data)
-    umpires = []
-    umpire_nodes = root.find('umpires').findall('umpire')
-    for person in umpire_nodes:
-        umpire = {'gid': gid, 'game_pk': game_pk}
-        for attr in person.attrib:
-            umpire[attr] = person.attrib[attr]
-        umpires.append(umpire)
-    return umpires
-
-def get_hip(game):
-    """Returns hip points for a game dictionary"""
-    if 'gid' in game:
-        gid = game['gid']
-    else:
-        print('No gid for game')
-        print(game)
-        raise ValueError('gid key required for get_hip')
-    if 'game_pk' in game:
-        game_pk = game['game_pk']
-    else:
-        game_pk = ''
+def get_hip(gid, game_pk):
     data = dl.download_gid_file(gid, 'inning_hip.xml')
     root = ET.fromstring(data)
     hips = []
     hip_nodes = root.findall('hip')
     for node in hip_nodes:
         hip = {'gid': gid, 'game_pk': game_pk}
-        for attr in node.attrib:
-            hip[attr] = node.attrib[attr]
+        hip = parse_attributes(hip, node, 'hip')
         hips.append(hip)
     return hips
 
-def get_atbats(game):
-    """Returns atbats for a game dictionary"""
-    if 'gid' in game:
-        gid = game['gid']
+def get_base_state(bases):
+    """Returns string base state from bases dictionary"""
+    if bases['1B'] is not None:
+        if bases['2B'] is not None:
+            if bases['3B'] is not None:
+                base_state = '123'
+            else:
+                base_state = '120'
+        else:
+            if bases['3B'] is not None:
+                base_state = '103'
+            else:
+                base_state = '100'
     else:
-        print('No gid for game')
-        print(game)
-        raise ValueError('gid key required for get_atbats')
-    if 'game_pk' in game:
-        game_pk = game['game_pk']
-    else:
-        game_pk = ''
+        if bases['2B'] is not None:
+            if bases['3B'] is not None:
+                base_state = '023'
+            else:
+                base_state = '020'
+        else:
+            if bases['3B'] is not None:
+                base_state = '003'
+            else:
+                base_state = '000'
+    return base_state
+
+def get_events(gid, game_pk, venue_id):
+    """Returns event dictionary list for specificed game and venue"""
+
+    ### setup game variables ###
+    halves = {'top': 'top', 'bottom': 'bot'}
+    bases = {'1B': None, '2B': None, '3B': None, '': None}
+    runs = {'home_team_runs': 0, 'away_team_runs': 0}
+    players = get_players(gid, game_pk)
+    for umpire in players['umpires']:
+        if umpire['position'] == 'home':
+            home_umpire = umpire['umpire_id']
+
+    catcher = {'top': None, 'bot': None}
+    for player in players['players']:
+        if 'current_position' in player:
+            if player['current_position'] == 'C':
+                if player['home_flag'] == 1:
+                    catcher['bot'] = player['player_id']
+                elif player['home_flag'] == 0:
+                    catcher['top'] = player['player_id']
+
+    ### get inning_all data ###
     data = dl.download_gid_file(gid, 'inning_all.xml')
     root = ET.fromstring(data)
-    atbats = []
     innings = root.findall('inning')
-    halves = {'top': 'top', 'bottom': 'bot'}
+
+    ### beging traversing xml file ###
+    events = []
+    game_event_number = 1
     for inning in innings:
         inning_number = inning.attrib['num']
         for half in halves:
+            outs = 0
             inning_topbot = halves[half]
             inning_node = inning.find(half)
             if inning_node is not None:
-                atbat_nodes = inning_node.findall('atbat')
-                for node in atbat_nodes:
-                    atbat = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number}
-                    for attr in node.attrib:
-                        atbat[attr] = node.attrib[attr]
-                    atbat = get_child(node, atbat, 'pitch')
-                    atbat = get_child(node, atbat, 'runner')
-                    atbat = get_child(node, atbat, 'po')
-                    atbats.append(atbat)
-    return atbats
+                for node in inning_node:
+                    event = {'gid': gid, 'game_pk': game_pk, 'venue_id': venue_id, 'inning_topbot': inning_topbot, 'inning': inning_number, 'game_event_number': game_event_number, 'umpire': home_umpire, 'catcher': catcher[inning_topbot] ,'start_outs': outs}
+                    base_state = get_base_state(bases)
+                    event['start_base_state'] = base_state
+                    event['start_out_base_state'] = str(outs) + base_state
+                    for base in bases:
+                        event['start_' + base] = bases[base]
+                    for run in runs:
+                        event['start_' + run] = runs[run]
+                    event.pop('start_', None)
 
-def get_child(atbat_node, atbat, child_name):
-    """Returns atbat dictionary with pitches for xml node and atbat dictionary"""
-    gid = atbat['gid']
-    game_pk = atbat['game_pk']
-    inning_topbot = atbat['inning_topbot']
-    inning_number = atbat['inning']
-    bat_num = atbat['num']
-    child_nodes = atbat_node.findall(child_name)
-    children = []
-    for child in child_nodes:
-        child_dict = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'bat_num': bat_num}
-        for attr in child.attrib:
-            child_dict[attr] = child.attrib[attr]
-        if 'id' in child_dict:
-            child_dict[child_name + '_id'] = child_dict.pop('id','')
-        children.append(child_dict)
-    atbat[child_name] = children
-    return atbat
+                    if node.tag == 'atbat':
+                        ### parse atbat node ###
+                        atbat = dict(event)
+                        atbat['event_type'] = 'atbat'
+                        atbat = parse_attributes(atbat, node, 'atbat')
+                        event['pitcher'] = atbat['pitcher']
+                        event['batter'] = atbat['batter']
 
-def get_runners(game):
-    """Returns runners for a game dictionary"""
-    if 'gid' in game:
-        gid = game['gid']
-    else:
-        print('No gid for game')
-        print(game)
-        raise ValueError('gid key required for get_runners')
-    if 'game_pk' in game:
-        game_pk = game['game_pk']
-    else:
-        game_pk = ''
-    data = dl.download_gid_file(gid, 'inning_all.xml')
-    root = ET.fromstring(data)
-    runners = []
-    innings = root.findall('inning')
-    halves = {'top': 'top', 'bottom': 'bot'}
-    for inning in innings:
-        inning_number = inning.attrib['num']
-        for half in halves:
-            inning_topbot = halves[half]
-            inning_node = inning.find(half)
-            if inning_node is not None:
-                atbat_nodes = inning_node.findall('atbat')
-                for bat_node in atbat_nodes:
-                    runner_nodes = bat_node.findall('runner')
-                    bat_num = bat_node.attrib['num']
-                    for node in runner_nodes:
-                        runner = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'bat_num': bat_num}
-                        for attr in node.attrib:
-                            runner[attr] = node.attrib[attr]
-                        runners.append(runner)
-    return runners
+                        ### parse atbat children ###
+                        pitches = []
+                        pickoffs = []
+                        runners = []
+                        atbat_pickoff_number = 1
+                        for c, child in enumerate(node):
+                            if child.tag == 'pitch':
+                                ### parse pitch node ###
+                                pitch = dict(event)
+                                pitch = parse_attributes(pitch, child, 'pitch')
+                                ### add base state ###
+                                base_state = get_base_state(bases)
+                                for base in bases:
+                                    pitch['start_' + base] = bases[base]
+                                    pitch['start_base_state'] = base_state
+                                for run in runs:
+                                    pitch['start_' + run] = runs[run]
+                                pitches.append(pitch)
 
-def get_pickoffs(game):
-    """Returns runners for a game dictionary"""
-    if 'gid' in game:
-        gid = game['gid']
-    else:
-        print('No gid for game')
-        print(game)
-        raise ValueError('gid key required for get_pickoffs')
-    if 'game_pk' in game:
-        game_pk = game['game_pk']
-    else:
-        game_pk = ''
-    data = dl.download_gid_file(gid, 'inning_all.xml')
-    root = ET.fromstring(data)
-    pickoffs = []
-    innings = root.findall('inning')
-    halves = {'top': 'top', 'bottom': 'bot'}
-    for inning in innings:
-        inning_number = inning.attrib['num']
-        for half in halves:
-            inning_topbot = halves[half]
-            atbat_nodes = inning.find(half).findall('atbat')
-            for bat_node in atbat_nodes:
-                po_nodes = bat_node.findall('po')
-                bat_num = bat_node.attrib['num']
-                for node in po_nodes:
-                    po = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'bat_num': bat_num}
-                    for attr in node.attrib:
-                        po[attr] = node.attrib[attr]
-                    pickoffs.append(po)
-    return pickoffs
+                            elif child.tag == 'runner':
+                                ### parse runner node ###
+                                runner = dict(event)
+                                runner = parse_attributes(runner, child, 'runner')
 
-def get_actions(game):
-    """Returns actions for a game dictionary"""
-    if 'gid' in game:
-        gid = game['gid']
-    else:
-        print('No gid for game')
-        print(game)
-        raise ValueError('gid key required for get_actions')
-    if 'game_pk' in game:
-        game_pk = game['game_pk']
-    else:
-        game_pk = ''
-    data = dl.download_gid_file(gid, 'inning_all.xml')
-    root = ET.fromstring(data)
-    actions = []
-    innings = root.findall('inning')
-    halves = {'top': 'top', 'bottom': 'bot'}
-    action_number = 1
-    for inning in innings:
-        inning_number = inning.attrib['num']
-        for half in halves:
-            inning_topbot = halves[half]
-            inning_node = inning.find(half)
-            if inning_node is not None:
-                action_nodes = inning_node.findall('action')
-                for node in action_nodes:
-                    action = {'gid': gid, 'game_pk': game_pk, 'inning_topbot': inning_topbot, 'inning': inning_number, 'action_number': action_number}
-                    for attr in node.attrib:
-                        action[attr] = node.attrib[attr]
-                    actions.append(action)
-                    action_number += 1
-    return actions
+                                ### adjust changing base state ###
+                                if c + 1 == len(node):
+                                    ### occurs at this atbat ###
+                                    bases[runner['start']] = None
+                                    bases[runner['end']] = runner['runner_id']
+                                else:
+                                    if node[c + 1] == 'runner':
+                                        ### occurs at this atbat ###
+                                        bases[runner['start']] = None
+                                        bases[runner['end']] = runner['runner_id']
+                                    else:
+                                        ### occurs at previous action node ###
+
+                                        ### NEED TO ADJUST AT BAT OUTS FOR CAUGHT STEALING ###
+
+                                        bases[runner['start']] = None
+                                        bases[runner['end']] = runner['runner_id']
+                                        atbat['start_' + runner['start']] = None
+                                        atbat['start_' + runner['end']] = runner['runner_id']
+                                        event['start_' + runner['start']] = None
+                                        event['start_' + runner['end']] = runner['runner_id']
+                                        events[-1]['end_' + runner['start']] = None
+                                        events[-1]['end_' + runner['end']] = runner['runner_id']
+                                        events[-1]['pitcher'] = atbat['pitcher']
+                                        if 'score' in runner:
+                                            if atbat['inning_topbot'] == 'top':
+                                                runs['away_team_runs'] += 1
+                                                events[-1]['end_away_team_runs'] = runs['away_team_runs']
+                                                event['start_away_team_runs'] = runs['away_team_runs']
+                                                atbat['start_away_team_runs'] = runs['away_team_runs']
+                                            else:
+                                                runs['home_team_runs'] += 1
+                                                events[-1]['end_home_team_runs'] = runs['home_team_runs']
+                                                event['end_home_team_runs'] = runs['home_team_runs']
+                                                atbat['start_away_team_runs'] = runs['away_team_runs']
+
+                                ### add base state ###
+                                base_state = get_base_state(bases)
+                                for base in bases:
+                                    runner['start_' + base] = bases[base]
+                                    runner['start_base_state'] = base_state
+                                for run in runs:
+                                    runner['start_' + run] = runs[run]
+
+                                runners.append(runner)
+
+                            elif child.tag == 'po':
+                                ### parse pickoff node ###
+                                po = dict(event)
+                                po['atbat_pickoff_number'] = atbat_pickoff_number
+                                po = parse_attributes(po, child, 'pickoff')
+
+                                ### add base state ###
+                                base_state = get_base_state(bases)
+                                for base in bases:
+                                    po['start_' + base] = bases[base]
+                                    po['start_base_state'] = base_state
+                                for run in runs:
+                                    po['start_' + run] = runs[run]
+
+                                pickoffs.append(po)
+                                atbat_pickoff_number += 1
+
+                            ### add final base states to child nodes ###
+                            atbat['pitches'] = pitches
+                            atbat['runners'] = runners
+                            atbat['pickoffs'] = pickoffs
+
+                            ### get run changes from event ###
+                            for run in runs:
+                                if run in event:
+                                    runs[run] = atbat[run]
+                            outs = atbat['o']
+
+                            ### set end event values ###
+                            base_state = get_base_state(bases)
+                            out_base_state = str(outs) + base_state
+                            atbat['end_base_state'] = base_state
+                            atbat['end_out_base_state'] = out_base_state
+                            for base in bases:
+                                atbat['end_' + base] = bases[base]
+                                for pitch in atbat['pitches']:
+                                    pitch['end_' + base] = bases[base]
+                                for runner in atbat['runners']:
+                                    runner['end_' + base] = bases[base]
+                                for po in atbat['pickoffs']:
+                                    po['end_' + base] = bases[base]
+
+                            for run in runs:
+                                atbat['end_' + run] = runs[run]
+                                atbat['end_outs'] = outs
+                                for pitch in atbat['pitches']:
+                                    pitch['end_' + run] = runs[run]
+                                    pitch['end_base_state'] = base_state
+                                    pitch['end_outs'] = outs
+                                    pitch['end_out_base_state'] = out_base_state
+                                    pitch.pop('start_', None)
+                                    pitch.pop('end_', None)
+                                for runner in atbat['runners']:
+                                    runner['end_' + run] = runs[run]
+                                    runner['end_base_state'] = base_state
+                                    runner['end_outs'] = outs
+                                    runner['end_out_base_state'] = out_base_state
+                                    runner.pop('start_', None)
+                                    runner.pop('end_', None)
+                                for po in atbat['pickoffs']:
+                                    po['end_' + run] = runs[run]
+                                    po['end_base_state'] = base_state
+                                    po['end_outs'] = outs
+                                    po['end_out_base_state'] = out_base_state
+                                    po.pop('start_', None)
+                                    po.pop('end_', None)
+
+                        atbat.pop('start_', None)
+                        atbat.pop('end_', None)
+                        atbat.pop('', None)
+                        atbat.pop('home_team_runs', None)
+                        atbat.pop('away_team_runs', None)
+                        events.append(atbat)
+                        game_event_number += 1
+
+                    elif node.tag == 'action':
+                        ### parse action node ###
+                        action = dict(event)
+                        action['event_type'] = 'action'
+                        action = parse_attributes(action, node, 'action')
+                        base_state = get_base_state(bases)
+                        action['end_base_state'] = base_state
+                        action['end_out_base_state'] = str(outs) + base_state
+                        for base in bases:
+                            action['end_' + base] = bases[base]
+                        for run in runs:
+                            action['end_' + run] = runs[run]
+                        action.pop('end_', None)
+                        events.append(action)
+                        game_event_number += 1
+    return events
 
 def get_trajectory_df(year):
+    """reads downloaded csv files into pandas dataframe"""
     files_dir = join(dirname(__file__), 'data/savant', str(year))
     player_files = [f for f in listdir(files_dir) if isfile(join(files_dir, f))]
     df = pd.DataFrame()

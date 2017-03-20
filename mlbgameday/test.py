@@ -1,6 +1,6 @@
 """
-This module is for testing future function with game data from mlbgameday, which is subject to the license at:
-http://gd2.mlb.com/components/copyright.txt
+This module is for testing future function with game data from mlbgameday,
+which is subject to the license at: http://gd2.mlb.com/components/copyright.txt
 """
 
 import parse as p

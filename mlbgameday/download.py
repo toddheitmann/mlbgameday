@@ -1,6 +1,6 @@
 """
-This module downloads data from mlbgameday, which is subject to the license at:
-http://gd2.mlb.com/components/copyright.txt
+This module downloads data from mlbgameday
+which is subject to the license at: http://gd2.mlb.com/components/copyright.txt
 """
 
 import os
@@ -94,7 +94,7 @@ def download_team_names():
 
 def get_games(game_date):
     """Returns general game data for a date"""
-    pop = ['venue', 'time', 'time_date_aw_lg', 'time_date_hm_lg', 'time_zone', 'away_time', 'away_time_zone', 'away_ampm', 'home_ampm', 'time_zone_aw_lg', 'time_zone_hm_lg', 'time_aw_lg', 'aw_lg_ampm', 'tz_aw_lg_gen', 'time_hm_lg', 'hm_lg_ampm', 'tz_hm_lg_gen', 'scheduled_innings', 'venue_w_chan_loc', 'game_data_directory', 'top_inning', 'tv_station', 'ampm', 'tiebreaker_sw']
+    pop_list = ['id', 'time', 'time_date', 'time_date_aw_lg', 'time_date_hm_lg', 'time_zone', 'ampm', 'time_zone_aw_lg', 'time_zone_hm_lg', 'time_aw_lg', 'aw_lg_ampm', 'tz_aw_lg_gen', 'time_hm_lg', 'hm_lg_ampm', 'tz_hm_lg_gen', 'venue_w_chan_loc', 'time_zone_hm_lg', 'top_inning', 'inning', 'outs', 'mlbtv_link', 'wrapup_link', 'home_audio_link', 'away_audio_link', 'home_preview_link', 'away_preview_link', 'preview_link', 'postseason_tv_link', 'game_data_directory', 'resume_time_date_aw_lg', 'resume_time_date_hm_lg', 'resume_time', 'resume_away_ampm']
 
     data = download_miniscoreboard(game_date)
     root = ET.fromstring(data)
@@ -103,9 +103,23 @@ def get_games(game_date):
         if game.tag == 'game':
             game_info = {}
             for attr in game.attrib:
-                if 'link' not in attr:
-                    game_info[attr] = game.attrib[attr]
-            game_info['gid'] = game_info.pop('id','').replace('/','_').replace('-','_')
+                game_info[attr] = game.attrib[attr]
+            game_info['gid'] = game_info.pop('gameday_link', None)
+            game_info['game_date'] = game_date
+            date_string = game_date.strftime('%Y%m%d')
+            local_time_str = date_string + game_info['home_time'] + game_info['home_ampm']
+            game_info['datetime_local'] = dt.datetime.strptime(local_time_str, '%Y%m%d%I:%M%p')
+            if ':' in game_info['time']:
+                et_time_str = date_string + game_info['time'] + game_info['ampm']
+                game_info['datetime_et'] = dt.datetime.strptime(et_time_str, '%Y%m%d%I:%M%p')
+            else:
+                game_info['datetime_et'] = None
+            for p in pop_list:
+                game_info.pop(p, None)
+            if 'original_date' in game_info:
+                game_info['original_date'] = dt.datetime.strptime(game_info['original_date'], '%Y/%m/%d').date()
+            if 'resume_time_date' in game_info:
+                game_info['resume_time_date'] = dt.datetime.strptime(game_info['resume_time_date'], '%Y/%m/%d %H:%M')
             games.append(game_info)
     return games
 
