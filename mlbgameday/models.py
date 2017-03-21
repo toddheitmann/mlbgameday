@@ -11,23 +11,23 @@ Base = declarative_base()
 
 class Game(Base):
     __tablename__ = 'game'
-    game_pk = Column(Integer, primary_key=True)
+    game_pk = Column(Integer, primary_key = True)
+    game_date = Column(Date, primary_key = True)
     gid = Column(String(26))
     venue = Column(String(50))
     venue_id = Column(Integer)
     location = Column(String(20), default = '')
-    game_date = Column(Date)
     datetime_local = Column(DateTime)
     datetime_et = Column(DateTime)
     first_pitch_et = Column(String(5), default = '')
     home_time = Column(String(5))
     home_time_zone = Column(String(3))
     home_ampm = Column(String(2))
-    resume_home_time = Column(DateTime, default = None)
+    resume_home_time = Column(String(5), default = '')
     away_time = Column(String(5))
     away_time_zone = Column(String(3))
     away_ampm = Column(String(2))
-    resume_away_time = Column(DateTime, default = None)
+    resume_away_time = Column(String(5), default = '')
     day = Column(String(3))
     game_type = Column(String(1))
     home_name_abbrev = Column(String(3))
@@ -96,8 +96,8 @@ class Game(Base):
     tv_station = Column(String(60))
 
     def __repr__(self):
-        return '<Game(gid = %s, home = %i, away = %i, venue = %s)>' % \
-                (self.gid, self.home_team_runs, self.away_team_runs, self.venue)
+        return '<Game(gid = %s, home = %s, away = %s, venue = %s)>' % \
+                (self.gid, str(self.home_team_runs), str(self.away_team_runs), self.venue)
 
 class Player(Base):
     __tablename__ = 'player'
@@ -175,7 +175,7 @@ class HIP(Base):
                % (self.gid, self.inning, self.des)
 
 class Event(Base):
-    __tablename__ = 'Event'
+    __tablename__ = 'event'
     game_pk = Column(Integer, primary_key = True)
     game_event_number = Column(Integer, primary_key = True)
     gid = Column(String(26))
@@ -187,7 +187,7 @@ class Event(Base):
     play_guid = Column(String(36), default = '')
     pitcher = Column(Integer)
     catcher = Column(Integer)
-    battter = Column(Integer)
+    batter = Column(Integer)
     umpire = Column(Integer)
     player = Column(Integer, default = None)
     start_outs = Column(Integer)
@@ -234,12 +234,13 @@ class Event(Base):
 
     def __repr__(self):
         return '<Event(gid = %s, game_event_number = %i, inning = %i, event_type = %s)>' \
-               % (self.gid, self.game_event_number, self.inning, self.event_type))
+               % (self.gid, self.game_event_number, self.inning, self.event_type)
 
 class Pitch(Base):
     __tablename__ = 'pitch'
     game_pk = Column(Integer, primary_key = True)
-    pitch_id = Column(Integer, primary_key = True)
+    game_pitch_count = Column(Integer, primary_key = True)
+    pitch_id = Column(Integer)
     venue_id = Column(Integer)
     gid = Column(String)
     inning = Column(Integer)
@@ -297,8 +298,8 @@ class Pitch(Base):
     cc = Column(String(200))
     mt = Column(String(1))
     on_1b = Column(Integer, default = None)
-    on_2b = Column(Integer, default = None))
-    on_3b = Column(Integer, default = None))
+    on_2b = Column(Integer, default = None)
+    on_3b = Column(Integer, default = None)
     end_outs = Column(Integer)
     end_base_state = Column(String(3))
     end_out_base_state = Column(String(4))
@@ -315,12 +316,13 @@ class Pitch(Base):
 
 class Runner(Base):
     __tablename__ = 'runner'
-    game_pk = Column(Integer, primary_key = True, ForeignKey('game.game_pk'))
-    runner_id = Column(Integer, primary_key = True)
-    game_event_number = Column(Integer, primary_key = True)
+    game_pk = Column(Integer, primary_key = True)
+    game_runner_count = Column(Integer, primary_key = True)
+    runner_id = Column(Integer)
+    game_event_number = Column(Integer)
     venue_id = Column(Integer)
     gid = Column(String(26))
-    event_num = Column(Integer, default = None))
+    event_num = Column(Integer, default = None)
     inning = Column(Integer)
     inning_topbot = Column(String(3))
     pitcher = Column(Integer)
@@ -356,12 +358,12 @@ class Runner(Base):
 
 class Pickoff(Base):
     __tablename__ = 'pickoff'
-    game_pk = Column(Integer, primary_key = True, ForeignKey('game.game_pk'))
-    game_event_number = Column(Integer, primary_key = True)
-    atbat_pickoff_number = Column(Integer, primary_key = True)
+    game_pk = Column(Integer, primary_key = True)
+    game_pickofff_count = Column(Integer, primary_key = True)
+    game_event_number = Column(Integer)
     venue_id = Column(Integer)
     gid = Column(String(26))
-    event_num = Column(Integer, default = None))
+    event_num = Column(Integer, default = None)
     inning = Column(Integer)
     inning_topbot = Column(String(3))
     pitcher = Column(Integer)
@@ -459,3 +461,6 @@ class Trajectory(Base):
     def __repr__(self):
         return '<Trajectory(game_pk = %i, pitcher = %s, game_date = %s)>' % \
                (self.game_pk, self.player_name, self.game_date.srftime('%Y-%m-%d'))
+
+def create_db(engine):
+    Base.metadata.create_all(bind = engine)

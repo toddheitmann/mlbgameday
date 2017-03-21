@@ -1,5 +1,5 @@
 DATABASE = {
-    'drivername': 'postgres',
+    'drivername': 'sqlite',
     'host': 'localhost',
     'port': '5432',
     'username': 'YOUR_USERNAME',

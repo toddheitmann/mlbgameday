@@ -1,45 +1,36 @@
+"""
+This module is for database functions with game data from mlbgameday,
+which is subject to the license at: http://gd2.mlb.com/components/copyright.txt
+"""
+
+from os.path import isfile, dirname, join, exists
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.query import Query
 
 import settings
-from models import *
+import models
+
+import pandas as pd
 
 
-def db_create():
-    """Creates tables for the database"""
-    Base.metadata.create_all(engine)
+def create_session():
+    if settings.DATABASE['drivername'] == 'sqlite':
+        db_file = join(dirname(__file__),'data', 'mlbgameday.sqlite')
+        engine = create_engine('sqlite:////' + db_file)
+        if not isfile(db_file):
+            models.create_db(engine)
+    else:
+        engine = create_engine(URL(**settings.DATABSAE))
+    Session = sessionmaker(bind = engine)
+    return Session()
 
-class Connection(object):
-    """Database Connection Object"""
-    def __init__(self):
-        """Initializes database connection and sessionmaker"""
-        engine = create_engine(URL(**settings.DATABASE))
-        self.Session = sessionmaker(bind=engine)
+class MLBQuery(Query):
 
-    def insert(self, obj):
-        """Saves the object to the database"""
-        session = self.Session()
-        try:
-            session.add(obj)
-            session.commit()
-        except:
-            session.rollback()
-            raise
-        finally:
-            session.close()
+    def __init__(self, *args, **kwargs):
+        session = create_session()
+        Query.__init__(self, *args, **kwargs, session = session)
 
-        return obj
-
-class Game(Query):
-    """Game Table Object"""
-    def __init__(self, columns = []):
-        """Returns Query of Game table"""
-        engine = create_engine(URL(**settings.DATABASE))
-        Session = sessionmaker(bind = engine)
-        if len(columns > 0):
-            test = 'query with specified columns'
-        else:
-            super(WellModel, session = Session())
-
-    def frame():
-        """returns query object as pandas dataframe"""
-        return False
+    def frame(self):
+        """Return PANDAS DataFrame"""
+        return pd.read_sql(self.statement, self.session.bind)

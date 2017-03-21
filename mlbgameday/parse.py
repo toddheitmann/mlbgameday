@@ -17,41 +17,6 @@ except ImportError:
 
 import download as dl
 
-def parse_attributes(dictionary, xml_node, name):
-    """Adds attributes from xml node to a dictionary"""
-    attr_float = ['avg', 'era']
-    attr_int = ['id', 'game_pk', 'num', 'team_id', 'parent_team_id', 'hr', 'rbi', 'wins', 'losses' #players
-    'event_num', 'home_team_runs', 'away_team_runs','o']
-    for attr in xml_node.attrib:
-        if attr == 'sv_id':
-            dictionary['sv_id'] = dt.datetime.strptime(xml_node.attrib[attr], '%y%m%d_%H%M%S')
-        elif attr in attr_float:
-            if '-' not in xml_node.attrib[attr]:
-                dictionary[attr] = float(xml_node.attrib[attr])
-            else:
-                dictionary[attr] = None
-        elif attr in attr_int:
-            if attr == 'rbi' and name == 'runner':
-                dictionary[attr] = xml_node.attrib[attr]
-            elif ' ' not in xml_node.attrib[attr] and \
-                 '-' not in xml_node.attrib[attr] and \
-                 'null' not in xml_node.attrib[attr] and \
-                 len(xml_node.attrib[attr]) > 0:
-                dictionary[attr] = int(xml_node.attrib[attr])
-            else:
-                dictionary[attr] = None
-        else:
-            dictionary[attr] = xml_node.attrib[attr]
-    if 'id' in dictionary:
-        dictionary[name + '_id'] = dictionary.pop('id', None)
-    if name == 'pitch':
-        if 'type' in dictionary:
-            dictionary['p_type'] = dictionary.pop('type', None)
-    else:
-        if 'type' in dictionary:
-            dictionary[name + '_type'] = dictionary.pop('type', None)
-    return dictionary
-
 def get_players(gid, game_pk):
     data = dl.download_gid_file(gid, 'players.xml')
     root = ET.fromstring(data)
@@ -68,20 +33,20 @@ def get_players(gid, game_pk):
             if player_nodes is not None:
                 for person in player_nodes:
                     player = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag}
-                    player = parse_attributes(player, person, 'player')
+                    player = dl.get_attributes(player, person, 'player')
                     players.append(player)
             coach_nodes = elem.findall('coach')
             if coach_nodes is not None:
                 for person in coach_nodes:
                     coach = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag}
-                    coach = parse_attributes(coach, person, 'coach')
+                    coach = dl.get_attributes(coach, person, 'coach')
                     coaches.append(coach)
         elif elem.tag == 'umpires':
             umpire_nodes = elem.findall('umpire')
             if umpire_nodes is not None:
                 for person in umpire_nodes:
                     umpire = {'gid': gid, 'game_pk': game_pk}
-                    umpire = parse_attributes(umpire, person, 'umpire')
+                    umpire = dl.get_attributes(umpire, person, 'umpire')
                     umpires.append(umpire)
     return {'players': players, 'coaches': coaches, 'umpires': umpires}
 
@@ -92,7 +57,7 @@ def get_hip(gid, game_pk):
     hip_nodes = root.findall('hip')
     for node in hip_nodes:
         hip = {'gid': gid, 'game_pk': game_pk}
-        hip = parse_attributes(hip, node, 'hip')
+        hip = dl.get_attributes(hip, node, 'hip')
         hips.append(hip)
     return hips
 
@@ -151,6 +116,9 @@ def get_events(gid, game_pk, venue_id):
     ### beging traversing xml file ###
     events = []
     game_event_number = 1
+    game_pitch_count = 1
+    game_runner_count = 1
+    game_pickofff_count = 1
     for inning in innings:
         inning_number = inning.attrib['num']
         for half in halves:
@@ -173,7 +141,7 @@ def get_events(gid, game_pk, venue_id):
                         ### parse atbat node ###
                         atbat = dict(event)
                         atbat['event_type'] = 'atbat'
-                        atbat = parse_attributes(atbat, node, 'atbat')
+                        atbat = dl.get_attributes(atbat, node, 'atbat')
                         event['pitcher'] = atbat['pitcher']
                         event['batter'] = atbat['batter']
 
@@ -181,12 +149,12 @@ def get_events(gid, game_pk, venue_id):
                         pitches = []
                         pickoffs = []
                         runners = []
-                        atbat_pickoff_number = 1
                         for c, child in enumerate(node):
                             if child.tag == 'pitch':
                                 ### parse pitch node ###
                                 pitch = dict(event)
-                                pitch = parse_attributes(pitch, child, 'pitch')
+                                pitch['game_pitch_count'] = game_pitch_count
+                                pitch = dl.get_attributes(pitch, child, 'pitch')
                                 ### add base state ###
                                 base_state = get_base_state(bases)
                                 for base in bases:
@@ -195,11 +163,13 @@ def get_events(gid, game_pk, venue_id):
                                 for run in runs:
                                     pitch['start_' + run] = runs[run]
                                 pitches.append(pitch)
+                                game_pitch_count += 1
 
                             elif child.tag == 'runner':
                                 ### parse runner node ###
                                 runner = dict(event)
-                                runner = parse_attributes(runner, child, 'runner')
+                                runner['game_runner_count'] = game_runner_count
+                                runner = dl.get_attributes(runner, child, 'runner')
 
                                 ### adjust changing base state ###
                                 if c + 1 == len(node):
@@ -225,6 +195,7 @@ def get_events(gid, game_pk, venue_id):
                                         events[-1]['end_' + runner['start']] = None
                                         events[-1]['end_' + runner['end']] = runner['runner_id']
                                         events[-1]['pitcher'] = atbat['pitcher']
+                                        events[-1].pop('end_', None)
                                         if 'score' in runner:
                                             if atbat['inning_topbot'] == 'top':
                                                 runs['away_team_runs'] += 1
@@ -246,12 +217,13 @@ def get_events(gid, game_pk, venue_id):
                                     runner['start_' + run] = runs[run]
 
                                 runners.append(runner)
+                                game_runner_count += 1
 
                             elif child.tag == 'po':
                                 ### parse pickoff node ###
                                 po = dict(event)
-                                po['atbat_pickoff_number'] = atbat_pickoff_number
-                                po = parse_attributes(po, child, 'pickoff')
+                                po['game_pickofff_count'] = game_pickofff_count
+                                po = dl.get_attributes(po, child, 'pickoff')
 
                                 ### add base state ###
                                 base_state = get_base_state(bases)
@@ -262,7 +234,7 @@ def get_events(gid, game_pk, venue_id):
                                     po['start_' + run] = runs[run]
 
                                 pickoffs.append(po)
-                                atbat_pickoff_number += 1
+                                game_pickofff_count += 1
 
                             ### add final base states to child nodes ###
                             atbat['pitches'] = pitches
@@ -326,7 +298,7 @@ def get_events(gid, game_pk, venue_id):
                         ### parse action node ###
                         action = dict(event)
                         action['event_type'] = 'action'
-                        action = parse_attributes(action, node, 'action')
+                        action = dl.get_attributes(action, node, 'action')
                         base_state = get_base_state(bases)
                         action['end_base_state'] = base_state
                         action['end_out_base_state'] = str(outs) + base_state

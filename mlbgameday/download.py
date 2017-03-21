@@ -92,9 +92,62 @@ def download_team_names():
     with open('data/CurrentNames.csv','w') as f:
         f.write(response)
 
+def get_attributes(dictionary, xml_node, name):
+    """Adds attributes from xml node to a dictionary"""
+    attr_float = [
+    # game attributes
+    'home_games_back', 'away_games_back',
+    'home_games_back_wildcard', 'away_games_back_wildcard',
+    # player attributes
+    'avg', 'era']
+
+    attr_int = [
+    # Game Attributes
+    'venue_id', 'home_team_id', 'home_league_id', 'away_team_id', 'away_league_id',
+    'home_win', 'home_loss', 'away_win', 'away_loss', 'home_team_runs',
+    'away_team_runs', 'home_team_hits', 'away_team_hits', 'home_team_errors',
+    'away_team_errors', 'home_team_hr', 'away_team_hr', 'home_team_sb', 'away_team_sb',
+    'home_team_so', 'away_team_so', 'series_num', 'ser_home_nbr', 'ser_games', 'scheduled_innings',
+    # player attributes
+    'id', 'game_pk', 'num', 'team_id', 'parent_team_id', 'hr', 'rbi', 'wins', 'losses',
+    'event_num', 'home_team_runs', 'away_team_runs','o']
+
+    for attr in xml_node.attrib:
+        if attr == 'sv_id':
+            if len(xml_node.attrib[attr]) > 0:
+                dictionary['sv_id'] = dt.datetime.strptime(xml_node.attrib[attr], '%y%m%d_%H%M%S')
+            else:
+                dictionary['sv_id'] = None
+        elif attr in attr_float:
+            if '-' not in xml_node.attrib[attr]:
+                dictionary[attr] = float(xml_node.attrib[attr])
+            else:
+                dictionary[attr] = None
+        elif attr in attr_int:
+            if attr == 'rbi' and name == 'runner':
+                dictionary[attr] = xml_node.attrib[attr]
+            elif ' ' not in xml_node.attrib[attr] and \
+                 '-' not in xml_node.attrib[attr] and \
+                 'null' not in xml_node.attrib[attr] and \
+                 len(xml_node.attrib[attr]) > 0:
+                dictionary[attr] = int(xml_node.attrib[attr])
+            else:
+                dictionary[attr] = None
+        else:
+            dictionary[attr] = xml_node.attrib[attr]
+    if 'id' in dictionary:
+        dictionary[name + '_id'] = dictionary.pop('id', None)
+    if name == 'pitch':
+        if 'type' in dictionary:
+            dictionary['p_type'] = dictionary.pop('type', None)
+    else:
+        if 'type' in dictionary:
+            dictionary[name + '_type'] = dictionary.pop('type', None)
+    return dictionary
+
 def get_games(game_date):
     """Returns general game data for a date"""
-    pop_list = ['id', 'time', 'time_date', 'time_date_aw_lg', 'time_date_hm_lg', 'time_zone', 'ampm', 'time_zone_aw_lg', 'time_zone_hm_lg', 'time_aw_lg', 'aw_lg_ampm', 'tz_aw_lg_gen', 'time_hm_lg', 'hm_lg_ampm', 'tz_hm_lg_gen', 'venue_w_chan_loc', 'time_zone_hm_lg', 'top_inning', 'inning', 'outs', 'mlbtv_link', 'wrapup_link', 'home_audio_link', 'away_audio_link', 'home_preview_link', 'away_preview_link', 'preview_link', 'postseason_tv_link', 'game_data_directory', 'resume_time_date_aw_lg', 'resume_time_date_hm_lg', 'resume_time', 'resume_away_ampm']
+    pop_list = ['id', 'game_id', 'time', 'time_date', 'time_date_aw_lg', 'time_date_hm_lg', 'time_zone', 'ampm', 'time_zone_aw_lg', 'time_zone_hm_lg', 'time_aw_lg', 'aw_lg_ampm', 'tz_aw_lg_gen', 'time_hm_lg', 'hm_lg_ampm', 'tz_hm_lg_gen', 'venue_w_chan_loc', 'time_zone_hm_lg', 'top_inning', 'inning', 'outs', 'mlbtv_link', 'wrapup_link', 'home_audio_link', 'away_audio_link', 'home_preview_link', 'away_preview_link', 'preview_link', 'postseason_tv_link', 'game_data_directory', 'resume_time_date_aw_lg', 'resume_time_date_hm_lg', 'resume_time', 'resume_away_ampm']
 
     data = download_miniscoreboard(game_date)
     root = ET.fromstring(data)
@@ -102,8 +155,7 @@ def get_games(game_date):
     for game in root:
         if game.tag == 'game':
             game_info = {}
-            for attr in game.attrib:
-                game_info[attr] = game.attrib[attr]
+            game_info = get_attributes(game_info, game, 'game')
             game_info['gid'] = game_info.pop('gameday_link', None)
             game_info['game_date'] = game_date
             date_string = game_date.strftime('%Y%m%d')
@@ -120,6 +172,8 @@ def get_games(game_date):
                 game_info['original_date'] = dt.datetime.strptime(game_info['original_date'], '%Y/%m/%d').date()
             if 'resume_time_date' in game_info:
                 game_info['resume_time_date'] = dt.datetime.strptime(game_info['resume_time_date'], '%Y/%m/%d %H:%M')
+            if 'resume_date' in game_info:
+                game_info['resume_date'] = dt.datetime.strptime(game_info['resume_date'], '%Y/%m/%d').date()
             games.append(game_info)
     return games
 
