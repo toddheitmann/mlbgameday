@@ -1,8 +1,8 @@
 # MLBGame Data
 
-A python API for MLB data working with data from MLBAM Gameday [data](http://gd2.mlb.com/components/game/mlb/) and [Baseball Savant](https://baseballsavant.mlb.com). Stores data using [SQLAlchemy](https://www.sqlalchemy.org). Returns data in [PANDAS](http://pandas.pydata.org) data frames.
+A python API for baseball data working with data from MLBAM Gameday [data](http://gd2.mlb.com/components/game/mlb/), [Baseball Savant](https://baseballsavant.mlb.com), and [Retrosheet](http://www.retrosheet.org). Stores data using [SQLAlchemy](https://www.sqlalchemy.org). Returns data in [PANDAS](http://pandas.pydata.org) data frames.
 
-Data use is always subject to licenses by [MLB Advanced Media License](http://gd2.mlb.com/components/copyright.txt) and the [project license](https://github.com/toddheitmann/mlbgameday/blob/master/LICENSE).
+Data use is always subject to licenses by [MLB Advanced Media License](http://gd2.mlb.com/components/copyright.txt), [retrosheet](http://www.retrosheet.org/notice.txt), and the [project license](https://github.com/toddheitmann/mlbgameday/blob/master/LICENSE).
 
 ## Status
 
@@ -27,7 +27,7 @@ Right now, I see three main paths to bring this project online, reading and stor
 
   - [x] Update XML files
 
-  - [ ] Format XML files for database insertion
+  - [x] Format XML files for database insertion
 
   - [ ] Option to delete files after inserting into a database
 
@@ -39,11 +39,25 @@ Right now, I see three main paths to bring this project online, reading and stor
 
   - [ ] Option to delete files after inserting into a database
 
+- [ ] Using Retrosheet data
+
+  - [ ] Download event files
+
+  - [ ] Parse event files using chadwick
+
+  - [ ] Store data in database
+
+  - [ ] Update database with new data
+
+  - [ ] Delete files after insertion
+
 - [ ] Create and Maintain database
 
-  - [ ] Create database structure
+  - [x] Create database structure
 
-  - [ ] Create database from fresh install
+  - [ ] Create database relationships
+
+  - [x] Create database from fresh install
 
   - [ ] Update database
 
@@ -62,4 +76,12 @@ Being a pythonista, I'm slightly jealous of the regularly updated [PitchRx](http
 While getting initial functionality, I hope to provide added support for:
 - different database type (MySQL, PostgreSQL, etc...)
 - external data such as travel distances, weather information, etc...
-- OpenWAR, Game Scores, or other advanced metrics
+- OpenWAR, cFIP / DRA, or other advanced metrics
+
+### Thank You
+
+Many thanks to MLB Advanced Media for making gameday and pitchf/x data public.
+
+Also, many thanks to all those who support and add to Retrosheet!
+
+The information used here was obtained free of charge from and is copyrighted by Retrosheet.  Interested parties may contact Retrosheet at "www.retrosheet.org".

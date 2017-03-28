@@ -92,14 +92,14 @@ def get_base_state(bases):
                 base_state = '000'
     return base_state
 
-def get_events(gid, game_pk, venue_id):
+def get_events(gid, game_pk, venue_id, game_date):
     """Returns event dictionary list for specificed game and venue"""
 
     ### setup game variables ###
     halves = {'top': 'top', 'bottom': 'bot'}
     bases = {'1B': None, '2B': None, '3B': None, '': None}
     runs = {'home_team_runs': 0, 'away_team_runs': 0}
-    players = get_players(gid, game_pk)
+    players = get_players(gid, game_pk, game_date)
     for umpire in players['umpires']:
         if umpire['position'] == 'home':
             home_umpire = umpire['umpire_id']
@@ -305,6 +305,7 @@ def get_events(gid, game_pk, venue_id):
                         action['event_type'] = 'action'
                         action = dl.get_attributes(action, node, 'action')
                         base_state = get_base_state(bases)
+                        action['end_outs'] = str(outs)
                         action['end_base_state'] = base_state
                         action['end_out_base_state'] = str(outs) + base_state
                         for base in bases:

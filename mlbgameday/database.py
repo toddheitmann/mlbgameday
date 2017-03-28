@@ -36,24 +36,34 @@ def get_game_models(game_date):
     objects = []
     games = download.get_games(game_date)
     for game in games:
-        # objects.append(models.Game(**game))
-        # players = parse.get_players(game['gid'], game['game_pk'], game['game_date'])
-        # for player in players['players']:
-        #     objects.append(models.Player(**player))
-        # for coach in players['coaches']:
-        #     objects.append(models.Coach(**coach))
-        # for umpire in players['umpires']:
-        #     objects.append(models.Umpire(**umpire))
-        events = parse.get_events(game['gid'], game['game_pk'], game['venue_id'])
+        objects.append(models.Game(**game))
+        players = parse.get_players(game['gid'], game['game_pk'], game['game_date'])
+        for player in players['players']:
+            objects.append(models.Player(**player))
+        for coach in players['coaches']:
+            objects.append(models.Coach(**coach))
+        for umpire in players['umpires']:
+            objects.append(models.Umpire(**umpire))
+        events = parse.get_events(game['gid'], game['game_pk'], game['venue_id'], game_date)
         for event in events:
             pitches = event.pop('pitches', None)
-            runner = event.pop('runners', None)
+            if pitches is not None:
+                for pitch in pitches:
+                    objects.append(models.Pitch(**pitch))
+            runners = event.pop('runners', None)
+            if runners is not None:
+                for runner in runners:
+                    objects.append(models.Runner(**runner))
             pickoffs = event.pop('pickoffs', None)
+            if pickoffs is not None:
+                for pickoff in pickoffs:
+                    objects.append(models.Pickoff(**pickoff))
             if event['event_type'] == 'atbat':
+                event.pop('event_type', None)
                 objects.append(models.AtBat(**event))
             elif event['event_type'] == 'action':
+                event.pop('event_type', None)
                 objects.append(models.Action(**event))
-
     return objects
 
 def update_db():

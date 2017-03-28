@@ -9,6 +9,8 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
+### data model from mlbam gameday ###
+
 class Game(Base):
     __tablename__ = 'game'
     gid = Column(String(26), primary_key = True)
@@ -192,7 +194,6 @@ class AtBat(Base):
     catcher = Column(Integer)
     batter = Column(Integer)
     umpire = Column(Integer)
-    player = Column(Integer, default = None)
     start_outs = Column(Integer)
     start_base_state = Column(String(3))
     start_out_base_state = Column(String(4))
@@ -204,16 +205,11 @@ class AtBat(Base):
     b = Column(Integer)
     s = Column(Integer)
     o = Column(Integer)
-    home_team_runs = Column(Integer, default = None)
-    away_team_runs = Column(Integer, default = None)
-    pitch = Column(Integer, default = None)
     num = Column(Integer, default = None)
     p_throws = Column(String(1), default = '')
     stand = Column(String(1), default = '')
     b_height = Column(String(4), default = '')
     score = Column(String(1), default = '')
-    tfs = Column(String(6), default = '')
-    tfs_zulu = Column(String(20), default = '')
     start_tfs = Column(String(6), default = '')
     start_tfs_zulu = Column(String(20), default = '')
     des = Column(String(425))
@@ -268,15 +264,9 @@ class Action(Base):
     home_team_runs = Column(Integer, default = None)
     away_team_runs = Column(Integer, default = None)
     pitch = Column(Integer, default = None)
-    num = Column(Integer, default = None)
-    p_throws = Column(String(1), default = '')
-    stand = Column(String(1), default = '')
-    b_height = Column(String(4), default = '')
     score = Column(String(1), default = '')
     tfs = Column(String(6), default = '')
     tfs_zulu = Column(String(20), default = '')
-    start_tfs = Column(String(6), default = '')
-    start_tfs_zulu = Column(String(20), default = '')
     des = Column(String(425))
     des_es = Column(String(400))
     event = Column(String(25))
@@ -458,6 +448,9 @@ class Pickoff(Base):
         return '<Pickoff(gid = %s, game_event_number = %i, atbat_pickoff_number = %s)>' \
                % (self.gid, self.game_event_number, self.atbat_pickoff_numbers)
 
+
+### data model from baseball savant trajectory csv downloads ###
+
 class Trajectory(Base):
     __tablename__ = 'trajectory'
     game_pk = Column(Integer, primary_key = True)
@@ -524,6 +517,12 @@ class Trajectory(Base):
     def __repr__(self):
         return '<Trajectory(game_pk = %i, pitcher = %s, game_date = %s)>' % \
                (self.game_pk, self.player_name, self.game_date.srftime('%Y-%m-%d'))
+
+
+### data model from retrosheet ###
+
+
+
 
 def create_db(engine):
     Base.metadata.create_all(bind = engine)
