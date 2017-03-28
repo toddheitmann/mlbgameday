@@ -147,7 +147,7 @@ def get_attributes(dictionary, xml_node, name):
 
 def get_games(game_date):
     """Returns general game data for a date"""
-    pop_list = ['id', 'game_id', 'time', 'time_date', 'time_date_aw_lg', 'time_date_hm_lg', 'time_zone', 'ampm', 'time_zone_aw_lg', 'time_zone_hm_lg', 'time_aw_lg', 'aw_lg_ampm', 'tz_aw_lg_gen', 'time_hm_lg', 'hm_lg_ampm', 'tz_hm_lg_gen', 'venue_w_chan_loc', 'time_zone_hm_lg', 'top_inning', 'inning', 'outs', 'mlbtv_link', 'wrapup_link', 'home_audio_link', 'away_audio_link', 'home_preview_link', 'away_preview_link', 'preview_link', 'postseason_tv_link', 'game_data_directory', 'resume_time_date_aw_lg', 'resume_time_date_hm_lg', 'resume_time', 'resume_away_ampm']
+    pop_list = ['id', 'game_id', 'time', 'time_date', 'time_date_aw_lg', 'time_date_hm_lg', 'time_zone', 'ampm', 'time_zone_aw_lg', 'time_zone_hm_lg', 'time_aw_lg', 'aw_lg_ampm', 'tz_aw_lg_gen', 'time_hm_lg', 'hm_lg_ampm', 'tz_hm_lg_gen', 'venue_w_chan_loc', 'time_zone_hm_lg', 'top_inning', 'inning', 'outs', 'mlbtv_link', 'wrapup_link', 'home_audio_link', 'away_audio_link', 'home_preview_link', 'away_preview_link', 'preview_link', 'postseason_tv_link', 'game_data_directory', 'resume_time_date_aw_lg', 'resume_time_date_hm_lg', 'resume_time', 'resume_away_ampm', 'runner_on_base_status']
 
     data = download_miniscoreboard(game_date)
     root = ET.fromstring(data)
@@ -174,7 +174,8 @@ def get_games(game_date):
                 game_info['resume_time_date'] = dt.datetime.strptime(game_info['resume_time_date'], '%Y/%m/%d %H:%M')
             if 'resume_date' in game_info:
                 game_info['resume_date'] = dt.datetime.strptime(game_info['resume_date'], '%Y/%m/%d').date()
-            games.append(game_info)
+            if game_date == dt.datetime.strptime(game_info['gid'][:10], '%Y_%m_%d').date():
+                games.append(game_info)
     return games
 
 def update_miniscoreboard(start_date = None, end_date = None):
@@ -187,7 +188,6 @@ def update_miniscoreboard(start_date = None, end_date = None):
 
     for d in range(delta.days):
         game_date = start_date + dt.timedelta(d)
-        print(game_date)
         download_miniscoreboard(game_date)
 
 def update_gid_files(start_date = None, end_date = None):
@@ -200,7 +200,6 @@ def update_gid_files(start_date = None, end_date = None):
 
     for d in range(delta.days):
         game_date = start_date + dt.timedelta(d)
-        print(game_date)
         games = get_games(game_date)
         for game in games:
             if game['status'] == 'Final' or game['status'] == 'Completed Early':
@@ -263,9 +262,12 @@ def download_trajectory_csvs(start_year = None, end_year = None, overwrite = Fal
                 with gzip.open(file_name + '.gz', 'wb') as f:
                     f.write(''.encode())
 
-def update_all(start_date = None, end_date = None):
+def update_xml(start_date = None, end_date = None):
     update_miniscoreboard(start_date = start_date, end_date = end_date)
     update_gid_files(start_date = start_date, end_date = end_date)
+
+def update_all(start_date = None, end_date = None):
+    update_xml(start_date = start_date, end_date = end_date)
     if start_date is not None:
         start_year = start_date.year
     else:

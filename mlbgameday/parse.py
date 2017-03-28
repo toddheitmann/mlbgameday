@@ -17,7 +17,7 @@ except ImportError:
 
 import download as dl
 
-def get_players(gid, game_pk):
+def get_players(gid, game_pk, game_date):
     data = dl.download_gid_file(gid, 'players.xml')
     root = ET.fromstring(data)
     players = []
@@ -32,20 +32,25 @@ def get_players(gid, game_pk):
             player_nodes = elem.findall('player')
             if player_nodes is not None:
                 for person in player_nodes:
-                    player = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag}
+                    player = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag, 'game_date': game_date}
                     player = dl.get_attributes(player, person, 'player')
+                    if len(player['first']) < 1:
+                        # mlb errors for player allocation at games example:
+                        # http://gd2.mlb.com/components/game/mlb/year_2010/
+                        # month_03/day_13/gid_2010_03_13_minmlb_phimlb_1/players.xml
+                        continue
                     players.append(player)
             coach_nodes = elem.findall('coach')
             if coach_nodes is not None:
                 for person in coach_nodes:
-                    coach = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag}
+                    coach = {'gid': gid, 'game_pk': game_pk, 'home_flag': home_flag, 'game_date': game_date}
                     coach = dl.get_attributes(coach, person, 'coach')
                     coaches.append(coach)
         elif elem.tag == 'umpires':
             umpire_nodes = elem.findall('umpire')
             if umpire_nodes is not None:
                 for person in umpire_nodes:
-                    umpire = {'gid': gid, 'game_pk': game_pk}
+                    umpire = {'gid': gid, 'game_pk': game_pk, 'game_date': game_date}
                     umpire = dl.get_attributes(umpire, person, 'umpire')
                     umpires.append(umpire)
     return {'players': players, 'coaches': coaches, 'umpires': umpires}
