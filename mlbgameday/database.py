@@ -84,23 +84,11 @@ def update_db():
     ### increment to day not in database and bulk insert ###
     last_game_date = last_game_date + dt.timedelta(days = 1)
 
-    game_dates = []
-    objects = []
     for d in range((dt.date.today() - last_game_date).days):
         game_date = last_game_date + dt.timedelta(d)
-        game_dates.append(game_date)
-        objects += get_game_models(game_date)
-
-    # ### multiprocess game objects ###
-    # pool = Pool(4)
-    # results = pool.map(get_game_models, game_dates)
-    # pool.close()
-    # pool.join()
-    #
-    # ### commit to database ###
-    # objects = [val for sublist in results for val in sublist]
-    session.bulk_save_objects(objects)
-    session.commit()
+        objects = get_game_models(game_date)
+        session.bulk_save_objects(objects)
+        session.commit()
     session.close()
 
 class MLBQuery(Query):

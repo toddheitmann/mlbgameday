@@ -90,3 +90,4 @@ ENV/
 
 # sqlite database
 **/*.sqlite
+**/*.sqlite-journal

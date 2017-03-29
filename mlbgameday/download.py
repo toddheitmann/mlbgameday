@@ -266,7 +266,7 @@ def update_xml(start_date = None, end_date = None):
     update_miniscoreboard(start_date = start_date, end_date = end_date)
     update_gid_files(start_date = start_date, end_date = end_date)
 
-def update_all(start_date = None, end_date = None):
+def update_all(start_date = None, end_date = None, overwrite = True):
     update_xml(start_date = start_date, end_date = end_date)
     if start_date is not None:
         start_year = start_date.year
@@ -276,4 +276,4 @@ def update_all(start_date = None, end_date = None):
         end_year = end_date.year
     else:
         end_year = None
-    download_trajectory_csvs(start_year = start_year, end_year = end_year, overwrite = True)
+    download_trajectory_csvs(start_year = start_year, end_year = end_year, overwrite = overwrite)
