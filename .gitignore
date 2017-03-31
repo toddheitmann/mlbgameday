@@ -91,3 +91,7 @@ ENV/
 # sqlite database
 **/*.sqlite
 **/*.sqlite-journal
+
+# retrosheet files
+**/data/event/
+**/data/gamelogs/

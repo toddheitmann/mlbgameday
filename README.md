@@ -41,9 +41,15 @@ Right now, I see three main paths to bring this project online, reading and stor
 
 - [ ] Using Retrosheet data
 
-  - [ ] Download event files
+  - [x] Download event files
 
   - [ ] Parse event files using chadwick
+
+    - [x] Windows: include chadwick executables and call to parse
+
+    - [ ] Mac: Require installation via: '''{r, engine='bash', count_lines}brew install chadwick'''
+
+    - [ ] Linux: Provide installation instructions
 
   - [ ] Store data in database
 
