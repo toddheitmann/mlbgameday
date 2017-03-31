@@ -64,6 +64,9 @@ def get_game_models(game_date):
             elif event['event_type'] == 'action':
                 event.pop('event_type', None)
                 objects.append(models.Action(**event))
+        hips = parse.get_hip(game['gid'], game['game_pk'], game['venue_id'])
+        for hip in hips:
+            objects.append(models.HIP(**hip))
     return objects
 
 def update_db():

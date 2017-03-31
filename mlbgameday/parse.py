@@ -55,13 +55,13 @@ def get_players(gid, game_pk, game_date):
                     umpires.append(umpire)
     return {'players': players, 'coaches': coaches, 'umpires': umpires}
 
-def get_hip(gid, game_pk):
+def get_hip(gid, game_pk, venue_id):
     data = dl.download_gid_file(gid, 'inning_hip.xml')
     root = ET.fromstring(data)
     hips = []
     hip_nodes = root.findall('hip')
     for node in hip_nodes:
-        hip = {'gid': gid, 'game_pk': game_pk}
+        hip = {'gid': gid, 'game_pk': game_pk, 'venue_id': venue_id}
         hip = dl.get_attributes(hip, node, 'hip')
         hips.append(hip)
     return hips

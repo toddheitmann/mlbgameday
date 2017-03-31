@@ -168,6 +168,7 @@ class HIP(Base):
     gid = Column(String(26), primary_key = True)
     pitcher = Column(Integer, primary_key = True)
     batter = Column(Integer, primary_key = True)
+    venue_id = Column(Integer)
     game_pk = Column(Integer)
     des = Column(String(20))
     x = Column(Float)

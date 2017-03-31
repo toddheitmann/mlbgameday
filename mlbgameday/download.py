@@ -99,7 +99,11 @@ def get_attributes(dictionary, xml_node, name):
     'home_games_back', 'away_games_back',
     'home_games_back_wildcard', 'away_games_back_wildcard',
     # player attributes
-    'avg', 'era']
+    'avg', 'era',
+    # pitch attributes
+    'x', 'y', 'start_speed', 'end_speed', 'sz_top', 'sz_bot', 'pfx_x', 'pfx_z',
+    'px', 'pz', 'x0', 'y0', 'z0', 'vx0', 'vy0', 'vz0', 'ax', 'ay', 'az',
+    'break_y', 'break_angle', 'break_length', 'type_confidence']
 
     attr_int = [
     # Game Attributes
@@ -120,7 +124,10 @@ def get_attributes(dictionary, xml_node, name):
                 dictionary['sv_id'] = None
         elif attr in attr_float:
             if '-' not in xml_node.attrib[attr]:
-                dictionary[attr] = float(xml_node.attrib[attr])
+                try:
+                    dictionary[attr] = float(xml_node.attrib[attr])
+                except:
+                    dictionary[attr] = None
             else:
                 dictionary[attr] = None
         elif attr in attr_int:
