@@ -47,7 +47,11 @@ Right now, I see three main paths to bring this project online, reading and stor
 
     - [x] Windows: include chadwick executables and call to parse
 
-    - [ ] Mac: Require installation via: '''{r, engine='bash', count_lines}brew install chadwick'''
+    - [x] Mac: Require installation via [homebrew](https://brew.sh):
+
+        '''bash
+        brew install chadwick
+        '''
 
     - [ ] Linux: Provide installation instructions
 

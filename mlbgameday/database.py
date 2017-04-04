@@ -16,7 +16,6 @@ import pandas as pd
 from io import BytesIO
 
 try:
-    from io import StringIO
     from urllib.request import urlopen
 except ImportError:
     from urllib2 import urlopen
