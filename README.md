@@ -49,7 +49,7 @@ Right now, I see three main paths to bring this project online, reading and stor
 
     - [x] Mac: Require installation via [homebrew](https://brew.sh):
 
-        '''bash
+        '''
         brew install chadwick
         '''
 
