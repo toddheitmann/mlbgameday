@@ -4,18 +4,23 @@ which is subject to the license at: http://gd2.mlb.com/components/copyright.txt
 """
 
 import os
-from os.path import isfile, dirname, join, exists
+from os.path import isfile, isdir, dirname, join, exists
+import shutil
 import gzip
 import re
 import time
 import datetime as dt
 import xml.etree.ElementTree as ET
+from zipfile import ZipFile
+from io import BytesIO
 
 try:
     from urllib.request import urlopen
     from urllib.error import HTTPError
 except ImportError:
     from urllib2 import urlopen, HTTPError
+
+import constants
 
 def format_gid_date(gid):
     """Returns date object for gid"""
@@ -181,7 +186,13 @@ def get_games(game_date):
                 game_info['resume_time_date'] = dt.datetime.strptime(game_info['resume_time_date'], '%Y/%m/%d %H:%M')
             if 'resume_date' in game_info:
                 game_info['resume_date'] = dt.datetime.strptime(game_info['resume_date'], '%Y/%m/%d').date()
+            if 'home_code' in game_info:
+                game_info['home_code'] = game_info['home_code'].upper()
+            if 'away_code' in game_info:
+                game_info['away_code'] = game_info['away_code'].upper()
             if game_date == dt.datetime.strptime(game_info['gid'][:10], '%Y_%m_%d').date():
+                game_number = str(int(game_info['gid'][-1]) - 1)
+                game_info['retro_gid'] = game_info['home_code'] + game_date.strftime('%Y%m%d') + game_number
                 games.append(game_info)
     return games
 
@@ -215,8 +226,20 @@ def update_gid_files(start_date = None, end_date = None):
                 download_gid_file(gid, 'inning_hit.xml')
                 download_gid_file(gid, 'inning_all.xml')
 
+def update_xml(start_date = None, end_date = None):
+    update_miniscoreboard(start_date = start_date, end_date = end_date)
+    update_gid_files(start_date = start_date, end_date = end_date)
+
+def remove_mlbam_downloads():
+    start_year = 2010
+    end_year = dt.date.today().year
+    for year in range(start_year, end_year + 1):
+        directory = join(dirname(__file__), 'data', 'year_' + str(year))
+        if isdir(directory):
+            shutil.rmtree(directory)
+
 def download_trajectory_csvs(start_year = None, end_year = None, overwrite = False):
-    """Downloads Baseball Savant CSV Files"""
+    """Downloads Baseball trajectory CSV Files"""
     if start_year is None:
         start_year = 2015
 
@@ -242,11 +265,16 @@ def download_trajectory_csvs(start_year = None, end_year = None, overwrite = Fal
         time.sleep(1)
 
     data = []
+    download_year = str(start_year)
+    print('Downloading Trajectory data for %s.' % download_year)
     for player_year in players_years:
         player_year = player_year.split('_')
         player_id = player_year[0]
         year = player_year[1]
-        dir_name = join(dirname(__file__), 'data/savant', year)
+        if year != download_year:
+            download_year = year
+            print('Downloading Trajectory data for %s.' % download_year)
+        dir_name = join(dirname(__file__), 'data', 'trajectory', year)
         file_name = join(dir_name, player_id + '.csv.gz')
         if isfile(file_name) and not overwrite:
              with gzip.open(file_name, 'rb') as f:
@@ -269,18 +297,93 @@ def download_trajectory_csvs(start_year = None, end_year = None, overwrite = Fal
                 with gzip.open(file_name + '.gz', 'wb') as f:
                     f.write(''.encode())
 
-def update_xml(start_date = None, end_date = None):
-    update_miniscoreboard(start_date = start_date, end_date = end_date)
-    update_gid_files(start_date = start_date, end_date = end_date)
+def remove_trajectory_downloads():
 
-def update_all(start_date = None, end_date = None, overwrite = True):
-    update_xml(start_date = start_date, end_date = end_date)
-    if start_date is not None:
-        start_year = start_date.year
-    else:
-        start_year = None
-    if end_date is not None:
-        end_year = end_date.year
-    else:
-        end_year = None
-    download_trajectory_csvs(start_year = start_year, end_year = end_year, overwrite = overwrite)
+    directory = join(dirname(__file__), 'data', 'trajectory')
+    if isdir(directory):
+        shutil.rmtree(directory)
+
+def download_retrosheet(start_year = None, end_year = None):
+    """Downloads retrosheet game logs and event files"""
+
+    if start_year is None:
+        start_year = 1871
+    if end_year is None:
+        end_year = dt.date.today().year
+
+    raw_dir = join(dirname(__file__), 'data')
+    for i in range(start_year, end_year):
+        ### download gamee files ###
+        url_format = "http://www.retrosheet.org/gamelogs/gl%i.zip" % i
+        try:
+            url = urlopen(url_format)
+            zipfile = ZipFile(BytesIO(url.read()))
+            save_dir = join(raw_dir, 'gamelogs')
+            if not isdir(save_dir):
+                os.makedirs(save_dir)
+            zipfile.extractall(save_dir)
+        except:
+            ### year does not contain gamelog files ###
+            do = 'nothing'
+
+        ## download event files after 1920 ###
+        if i > 1920:
+            url_format = "http://www.retrosheet.org/events/%ieve.zip" % i
+            try:
+                url = urlopen(url_format)
+                zipfile = ZipFile(BytesIO(url.read()))
+                save_dir = join(raw_dir, 'event', str(i))
+                if not isdir(save_dir):
+                    os.makedirs(save_dir)
+                zipfile.extractall(save_dir)
+            except:
+                ### year does not contain event files ###
+                do = 'nothing'
+
+def get_url_data(url):
+    try:
+        call = urlopen(url)
+        response = call.read()
+    except:
+        ### 404 error ###
+        response = None
+    return response
+
+def download_teams():
+    url = 'http://www.retrosheet.org/CurrentNames.csv'
+    return get_url_data(url)
+
+def download_people():
+    url = 'https://raw.githubusercontent.com/chadwickbureau/register/master/data/people.csv'
+    return get_url_data(url)
+
+def download_parks():
+    url = 'https://raw.githubusercontent.com/chadwickbureau/baseballdatabank/master/core/Parks.csv'
+    return get_url_data(url)
+
+def remove_retrosheet_downloads():
+
+    directory = join(dirname(__file__), 'data', 'gamelogs')
+    if isdir(directory):
+        shutil.rmtree(directory)
+
+    directory = join(dirname(__file__), 'data', 'event')
+    if isdir(directory):
+        shutil.rmtree(directory)
+
+def download_weather_table(gid, venue):
+    venue_data = constants.VENUE_DATA
+
+    year = gid[:4]
+    month = gid[5:7]
+    day = gid[8:10]
+    zip_code = venue_data[venue]['zip']
+    airport = venue_data[venue]['airport']
+
+    base_url = 'https://www.wunderground.com/history/airport/%s/%s/%s/%s/DailyHistory.html?reqdb.zip=%s'
+    url_format = base_url % (airport, year, month, day, zip_code)
+    url = urlopen(url_format)
+    response = repr(url.read())
+    time.sleep(1)
+    
+    return response

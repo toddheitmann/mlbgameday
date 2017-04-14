@@ -92,6 +92,9 @@ ENV/
 **/*.sqlite
 **/*.sqlite-journal
 
+# trajectory downloads
+**/data/trajectory/
+
 # retrosheet files
 **/data/event/
 **/data/gamelogs/

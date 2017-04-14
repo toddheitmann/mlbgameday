@@ -3,8 +3,13 @@ This module creates sqlalchemy classes mlbgameday data,
 which is subject to the license at http://gd2.mlb.com/components/copyright.txt
 """
 
-from sqlalchemy import Column, Date, DateTime, Float, Integer, SmallInteger, String, func, ForeignKey
+import datetime as dt
+from dateutil.relativedelta import relativedelta
+
+from sqlalchemy import Column, Date, DateTime, Float, Integer, String, ForeignKey
 from sqlalchemy.orm import backref, relationship
+from sqlalchemy.schema import ForeignKeyConstraint
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -96,6 +101,19 @@ class Game(Base):
     scheduled_innings = Column(Integer)
     if_necessary = Column(String(1), default = '')
     tv_station = Column(String(60))
+    ### weather ###
+    temperature = Column(Float)
+    heat_index = Column(Float)
+    dew_point = Column(Float)
+    humidity = Column(Float)
+    pressure = Column(Float)
+    visibility = Column(Float)
+    wind_dir = Column(String(5))
+    wind_speed = Column(Float)
+    gust_speed = Column(Float)
+    precipitation = Column(Float)
+    ### retrosheet ###
+    retro_gid = Column(String(12), ForeignKey('game_log.game_id'))
 
     def __repr__(self):
         return '<Game(gid = %s, game_pk = %i, home = %s, away = %s, venue = %s)>' % \
@@ -103,8 +121,8 @@ class Game(Base):
 
 class Player(Base):
     __tablename__ = 'player'
-    gid = Column(String(26), primary_key = True)
-    player_id = Column(Integer, primary_key = True)
+    gid = Column(String(26), ForeignKey('game.gid'), primary_key = True)
+    player_id = Column(Integer, ForeignKey('person.key_mlbam'), primary_key = True)
     home_flag = Column(Integer, primary_key = True)
     game_date = Column(DateTime)
     game_pk = Column(Integer)
@@ -129,6 +147,8 @@ class Player(Base):
     wins = Column(Integer, default = None)
     losses = Column(Integer, default = None)
     era = Column(Float, default = None)
+    ### retrosheet ###
+    retro_gid = Column(String(12), ForeignKey('game_log.game_id'))
 
     def __repr__(self):
         return '<Player(gid = %s, game_pk = %i, player_id = %i boxname = %s)>' % \
@@ -136,8 +156,8 @@ class Player(Base):
 
 class Coach(Base):
     __tablename__ = 'coach'
-    gid = Column(String(26), primary_key = True)
-    coach_id = Column(Integer, primary_key = True)
+    gid = Column(String(26), ForeignKey('game.gid'), primary_key = True)
+    coach_id = Column(Integer, ForeignKey('person.key_mlbam'), primary_key = True)
     home_flag = Column(Integer, primary_key = True)
     game_date = Column(DateTime)
     game_pk = Column(Integer)
@@ -145,29 +165,34 @@ class Coach(Base):
     last = Column(String(15))
     num = Column(Integer)
     position = Column(String(25))
+    ### retrosheet ###
+    retro_gid = Column(String(12), ForeignKey('game_log.game_id'))
 
     def __repr__(self):
         return '<Coach(gid = %s, last = %s)>' % (self.gid, self.last)
 
 class Umpire(Base):
     __tablename__ = 'umpire'
-    gid = Column(String(26), primary_key = True)
-    umpire_id = Column(Integer, primary_key = True)
+    gid = Column(String(26), ForeignKey('game.gid'), primary_key = True)
+    umpire_id = Column(Integer, ForeignKey('person.key_mlbam'), primary_key = True)
     position = Column(String(6), primary_key = True)
     game_pk = Column(Integer)
     game_date = Column(DateTime)
     last = Column(String(15), default = '')
     first = Column(String(10), default = '')
     name = Column(String(25))
+    ### retrosheet ###
+    retro_gid = Column(String(12), ForeignKey('game_log.game_id'))
 
     def __repr__(self):
         return '<Umpire(gid = %s, last = %s)>' % (self.gid, self.last)
 
 class HIP(Base):
     __tablename__ = 'hip'
-    gid = Column(String(26), primary_key = True)
-    pitcher = Column(Integer, primary_key = True)
-    batter = Column(Integer, primary_key = True)
+    gid = Column(String(26), ForeignKey('game.gid'), primary_key = True)
+    pitcher = Column(Integer, ForeignKey('person.key_mlbam'), primary_key = True)
+    batter = Column(Integer, ForeignKey('person.key_mlbam'), primary_key = True)
+    game_date = Column(Date)
     venue_id = Column(Integer)
     game_pk = Column(Integer)
     des = Column(String(20))
@@ -176,6 +201,36 @@ class HIP(Base):
     hip_type = Column(Float)
     team = Column(String(1))
     inning = Column(Integer)
+    ### atbat ###
+    game_event_number = Column(Integer, default = None)
+    ### weather ###
+    temperature = Column(Float)
+    heat_index = Column(Float)
+    dew_point = Column(Float)
+    humidity = Column(Float)
+    pressure = Column(Float)
+    visibility = Column(Float)
+    wind_dir = Column(String(5))
+    wind_speed = Column(Float)
+    gust_speed = Column(Float)
+    precipitation = Column(Float)
+    ### retrosheet ###
+    retro_gid = Column(String(12), ForeignKey('game_log.game_id'))
+    retro_event_id = Column(Integer, default = None)
+
+    ### table arguements and relationships ###
+    __table_args__ = (
+                ForeignKeyConstraint(['retro_gid', 'retro_event_id'],
+                                ['event.game_id', 'event.event_id']),
+                ForeignKeyConstraint(['gid', 'game_event_number'],
+                                ['atbat.gid', 'atbat.game_event_number']),
+                     )
+
+    retro_event = relationship('Event', primaryjoin = 'and_(Event.game_id == HIP.retro_gid,'\
+                    'Event.event_id == HIP.retro_event_id)')
+
+    atbat = relationship('AtBat', primaryjoin = 'and_(AtBat.gid == HIP.gid,'\
+                    'AtBat.game_event_number == HIP.game_event_number)')
 
     def __repr__(self):
         return '<HIP(gid = %s, inning = %s, des = %s)>' \
@@ -183,18 +238,20 @@ class HIP(Base):
 
 class AtBat(Base):
     __tablename__ = 'atbat'
-    gid = Column(String(26), primary_key = True)
+    gid = Column(String(26), ForeignKey('game.gid'), primary_key = True)
     game_event_number = Column(Integer, primary_key = True)
+    game_date = Column(Date)
+    date_time = Column(DateTime)
     game_pk = Column(Integer)
     venue_id = Column(Integer)
     event_num = Column(Integer)
     inning = Column(Integer)
     inning_topbot = Column(String(3))
     play_guid = Column(String(36), default = '')
-    pitcher = Column(Integer)
-    catcher = Column(Integer)
-    batter = Column(Integer)
-    umpire = Column(Integer)
+    pitcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    catcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    batter = Column(Integer, ForeignKey('person.key_mlbam'))
+    umpire = Column(Integer, ForeignKey('person.key_mlbam'))
     start_outs = Column(Integer)
     start_base_state = Column(String(3))
     start_out_base_state = Column(String(4))
@@ -231,25 +288,42 @@ class AtBat(Base):
     end_1B = Column(Integer)
     end_2B = Column(Integer)
     end_3B = Column(Integer)
+    ### weather ###
+    temperature = Column(Float)
+    heat_index = Column(Float)
+    dew_point = Column(Float)
+    humidity = Column(Float)
+    pressure = Column(Float)
+    visibility = Column(Float)
+    wind_dir = Column(String(5))
+    wind_speed = Column(Float)
+    gust_speed = Column(Float)
+    precipitation = Column(Float)
+    ### retrosheet ###
+    retro_gid = Column(String(12), ForeignKey('game_log.game_id'))
+    retro_event_id = Column(Integer, default = None)
 
     def __repr__(self):
-        return '<Event(gid = %s, game_event_number = %i, inning = %i, event_type = %s)>' \
-               % (self.gid, self.game_event_number, self.inning, self.event_type)
+        return '<AtBat(gid = %s, game_event_number = %i, inning = %i, des = %s)>' \
+               % (self.gid, self.game_event_number, self.inning, self.des)
 
 class Action(Base):
     __tablename__ = 'action'
-    gid = Column(String(26), primary_key = True)
+    gid = Column(String(26), ForeignKey('game.gid'), primary_key = True)
     game_event_number = Column(Integer, primary_key = True)
+    game_date = Column(Date)
+    date_time = Column(DateTime)
+    retro_gid = Column(String(12))
     game_pk = Column(Integer)
     venue_id = Column(Integer)
     event_num = Column(Integer)
     inning = Column(Integer)
     inning_topbot = Column(String(3))
     play_guid = Column(String(36), default = '')
-    pitcher = Column(Integer)
-    catcher = Column(Integer)
-    batter = Column(Integer)
-    umpire = Column(Integer)
+    pitcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    catcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    batter = Column(Integer, ForeignKey('person.key_mlbam'))
+    umpire = Column(Integer, ForeignKey('person.key_mlbam'))
     player = Column(Integer, default = None)
     start_outs = Column(Integer)
     start_base_state = Column(String(3))
@@ -286,15 +360,30 @@ class Action(Base):
     end_1B = Column(Integer)
     end_2B = Column(Integer)
     end_3B = Column(Integer)
+    ### weather ###
+    temperature = Column(Float)
+    heat_index = Column(Float)
+    dew_point = Column(Float)
+    humidity = Column(Float)
+    pressure = Column(Float)
+    visibility = Column(Float)
+    wind_dir = Column(String(5))
+    wind_speed = Column(Float)
+    gust_speed = Column(Float)
+    precipitation = Column(Float)
+    ### retrosheet ###
+    retro_gid = Column(String(12), ForeignKey('game_log.game_id'))
 
     def __repr__(self):
-        return '<Event(gid = %s, game_event_number = %i, inning = %i, event_type = %s)>' \
-               % (self.gid, self.game_event_number, self.inning, self.event_type)
+        return '<Action(gid = %s, game_event_number = %i, inning = %i, des = %s)>' \
+               % (self.gid, self.game_event_number, self.inning, self.des)
 
 class Pitch(Base):
     __tablename__ = 'pitch'
-    gid = Column(String(26), primary_key = True)
+    gid = Column(String(26), ForeignKey('game.gid'), primary_key = True)
     game_pitch_count = Column(Integer, primary_key = True)
+    game_date = Column(Date)
+    date_time = Column(DateTime)
     game_pk = Column(Integer)
     pitch_id = Column(Integer)
     venue_id = Column(Integer)
@@ -303,10 +392,10 @@ class Pitch(Base):
     game_event_number = Column(Integer)
     event_num = Column(Integer)
     event = Column(String(35))
-    pitcher = Column(Integer)
-    catcher = Column(Integer)
-    batter = Column(Integer)
-    umpire = Column(Integer)
+    pitcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    catcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    batter = Column(Integer, ForeignKey('person.key_mlbam'))
+    umpire = Column(Integer, ForeignKey('person.key_mlbam'))
     start_outs = Column(Integer)
     start_base_state = Column(String(3))
     start_out_base_state = Column(String(4))
@@ -363,6 +452,36 @@ class Pitch(Base):
     end_1B = Column(Integer)
     end_2B = Column(Integer)
     end_3B = Column(Integer)
+    ### weather ###
+    temperature = Column(Float)
+    heat_index = Column(Float)
+    dew_point = Column(Float)
+    humidity = Column(Float)
+    pressure = Column(Float)
+    visibility = Column(Float)
+    wind_dir = Column(String(5))
+    wind_speed = Column(Float)
+    gust_speed = Column(Float)
+    precipitation = Column(Float)
+    ### retrosheet ###
+    retro_gid = Column(String(12))
+    retro_event_id = Column(Integer, default = None)
+
+    ### table arguements and relationships ###
+    __table_args__ = (
+        ForeignKeyConstraint(['gid', 'game_event_number'],
+                             ['atbat.gid', 'atbat.game_event_number']),
+        ForeignKeyConstraint(['gid', 'game_event_number'],
+                             ['action.gid', 'action.game_event_number']),
+        ForeignKeyConstraint(['retro_gid', 'retro_event_id'],
+                             ['event.game_id', 'event.event_id']),
+                     )
+    atbat = relationship('AtBat', primaryjoin = 'and_(AtBat.gid == Pitch.gid, '\
+                             'AtBat.game_event_number == Pitch.game_event_number)')
+    action = relationship('Action', primaryjoin = 'and_(Action.gid == Pitch.gid, '\
+                             'Action.game_event_number == Pitch.game_event_number)', viewonly = True)
+    retro_event = relationship('Event', primaryjoin = 'and_(Event.game_id == Pitch.retro_gid, '\
+                             'Event.event_id == Pitch.retro_event_id)', viewonly = True)
 
     def __repr__(self):
         return '<Pitch(gid = %s, pitch_num = %i, pitch_type = %s)>' % \
@@ -371,8 +490,10 @@ class Pitch(Base):
 
 class Runner(Base):
     __tablename__ = 'runner'
-    gid = Column(String(26), primary_key = True)
+    gid = Column(String(26), ForeignKey('game.gid'), primary_key = True)
     game_runner_count = Column(Integer, primary_key = True)
+    game_date = Column(Date)
+    date_time = Column(DateTime)
     game_pk = Column(Integer)
     runner_id = Column(Integer)
     game_event_number = Column(Integer)
@@ -380,10 +501,10 @@ class Runner(Base):
     event_num = Column(Integer, default = None)
     inning = Column(Integer)
     inning_topbot = Column(String(3))
-    pitcher = Column(Integer)
-    catcher = Column(Integer)
-    batter = Column(Integer)
-    umpire = Column(Integer)
+    pitcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    catcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    batter = Column(Integer, ForeignKey('person.key_mlbam'))
+    umpire = Column(Integer, ForeignKey('person.key_mlbam'))
     start_outs = Column(Integer)
     start_base_state = Column(String(3))
     start_out_base_state = Column(String(4))
@@ -406,6 +527,31 @@ class Runner(Base):
     end_1B = Column(Integer)
     end_2B = Column(Integer)
     end_3B = Column(Integer)
+    ### weather ###
+    temperature = Column(Float)
+    heat_index = Column(Float)
+    dew_point = Column(Float)
+    humidity = Column(Float)
+    pressure = Column(Float)
+    visibility = Column(Float)
+    wind_dir = Column(String(5))
+    wind_speed = Column(Float)
+    gust_speed = Column(Float)
+    precipitation = Column(Float)
+    ### retrosheet ###
+    retro_gid = Column(String(12), ForeignKey('game_log.game_id'))
+
+    ### table arguements and relationships ###
+    __table_args__ = (
+        ForeignKeyConstraint(['gid', 'game_event_number'],
+                             ['atbat.gid', 'atbat.game_event_number']),
+        ForeignKeyConstraint(['gid', 'game_event_number'],
+                             ['action.gid', 'action.game_event_number']),
+                     )
+    atbat = relationship('AtBat', primaryjoin = 'and_(AtBat.gid == Runner.gid, '\
+                             'AtBat.game_event_number == Runner.game_event_number)')
+    action = relationship('Action', primaryjoin = 'and_(Action.gid == Runner.gid, '\
+                             'Action.game_event_number == Runner.game_event_number)', viewonly = True)
 
     def __repr__(self):
         return '<Runner(game_pk = %s, gid = %s, des = %s)>' % \
@@ -413,18 +559,20 @@ class Runner(Base):
 
 class Pickoff(Base):
     __tablename__ = 'pickoff'
-    gid = Column(String(26), primary_key = True)
+    gid = Column(String(26), ForeignKey('game.gid'), primary_key = True)
     game_pickofff_count = Column(Integer, primary_key = True)
+    game_date = Column(Date)
+    date_time = Column(DateTime)
     game_pk = Column(Integer)
     game_event_number = Column(Integer)
     venue_id = Column(Integer)
     event_num = Column(Integer, default = None)
     inning = Column(Integer)
     inning_topbot = Column(String(3))
-    pitcher = Column(Integer)
-    catcher = Column(Integer)
-    batter = Column(Integer)
-    umpire = Column(Integer)
+    pitcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    catcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    batter = Column(Integer, ForeignKey('person.key_mlbam'))
+    umpire = Column(Integer, ForeignKey('person.key_mlbam'))
     start_outs = Column(Integer)
     start_base_state = Column(String(3))
     start_out_base_state = Column(String(4))
@@ -444,6 +592,31 @@ class Pickoff(Base):
     end_1B = Column(Integer)
     end_2B = Column(Integer)
     end_3B = Column(Integer)
+    ### weather ###
+    temperature = Column(Float)
+    heat_index = Column(Float)
+    dew_point = Column(Float)
+    humidity = Column(Float)
+    pressure = Column(Float)
+    visibility = Column(Float)
+    wind_dir = Column(String(5))
+    wind_speed = Column(Float)
+    gust_speed = Column(Float)
+    precipitation = Column(Float)
+    ### retrosheet ###
+    retro_gid = Column(String(12), ForeignKey('game_log.game_id'))
+
+    ### table arguements and relationships ###
+    __table_args__ = (
+        ForeignKeyConstraint(['gid', 'game_event_number'],
+                             ['atbat.gid', 'atbat.game_event_number']),
+        ForeignKeyConstraint(['gid', 'game_event_number'],
+                             ['action.gid', 'action.game_event_number']),
+                     )
+    atbat = relationship('AtBat', primaryjoin = 'and_(AtBat.gid == Pickoff.gid,'\
+                             'AtBat.game_event_number == Pickoff.game_event_number)')
+    action = relationship('Action', primaryjoin = 'and_(Action.gid == Pickoff.gid,'\
+                             'Action.game_event_number == Pickoff.game_event_number)', viewonly = True)
 
     def __repr__(self):
         return '<Pickoff(gid = %s, game_event_number = %i, atbat_pickoff_number = %s)>' \
@@ -454,16 +627,16 @@ class Pickoff(Base):
 
 class Trajectory(Base):
     __tablename__ = 'trajectory'
-    game_pk = Column(Integer, primary_key = True)
+    game_pk = Column(Integer, ForeignKey('game.game_pk'), primary_key = True)
     pitch_id = Column(Integer, primary_key = True)
+    game_date = Column(DateTime, primary_key = True)
     pitch_type = Column(String(2))
-    game_date = Column(DateTime)
     start_speed = Column(Float)
     x0 = Column(Float)
     z0 = Column(Float)
     player_name = Column(String(30))
-    batter = Column(Integer)
-    pitcher = Column(Integer)
+    batter = Column(Integer, ForeignKey('person.key_mlbam'))
+    pitcher = Column(Integer, ForeignKey('person.key_mlbam'))
     events = Column(String(10))
     description = Column(String(20))
     spin_dir = Column(Float)
@@ -497,8 +670,8 @@ class Trajectory(Base):
     hc_y = Column(Float)
     tfs = Column(Integer)
     tfs_zulu = Column(DateTime)
-    catcher = Column(Integer)
-    umpire = Column(Integer)
+    catcher = Column(Integer, ForeignKey('person.key_mlbam'))
+    umpire = Column(Integer, ForeignKey('person.key_mlbam'))
     sv_id = Column(String(13))
     vx0 = Column(Float)
     vy0 = Column(Float)
@@ -514,19 +687,215 @@ class Trajectory(Base):
     effective_speed = Column(Float)
     release_spin_rate = Column(Float)
     release_extension = Column(Float)
+    ### weather ###
+    temperature = Column(Float)
+    heat_index = Column(Float)
+    dew_point = Column(Float)
+    humidity = Column(Float)
+    pressure = Column(Float)
+    visibility = Column(Float)
+    wind_dir = Column(String(5))
+    wind_speed = Column(Float)
+    gust_speed = Column(Float)
+    precipitation = Column(Float)
+    ### retrosheet ###
+    retro_gid = Column(String(12))
+    retro_event_id = Column(Integer, default = None)
+
+    ### table arguements and relationships ###
+    __table_args__ = (
+        ForeignKeyConstraint(['retro_gid', 'retro_event_id'],
+                             ['event.game_id', 'event.event_id']),
+                     )
+
+    retro_event = relationship('Event', primaryjoin = 'and_(Event.game_id == Trajectory.retro_gid,'\
+         'Event.event_id == Trajectory.retro_event_id)')
 
     def __repr__(self):
         return '<Trajectory(game_pk = %i, pitcher = %s, game_date = %s)>' % \
-               (self.game_pk, self.player_name, self.game_date.srftime('%Y-%m-%d'))
+               (self.game_pk, self.player_name, self.game_date.strftime('%Y-%m-%d'))
 
 
 ### data model from retrosheet ###
 
+class GameLog(Base):
+    __tablename__ = 'game_log'
+    game_id = Column(String(12),  primary_key = True)
+    game_date = Column(Date)
+    game_number = Column(String(1))
+    day = Column(String(3))
+    away_team_id = Column(String(3), ForeignKey('team.cur_fran_id'))
+    away_lg = Column(String(2))
+    away_game_number = Column(Integer)
+    home_team_id = Column(String(3), ForeignKey('team.cur_fran_id'))
+    home_lg = Column(String(2))
+    home_game_number = Column(Integer)
+    away_score_ct = Column(Integer)
+    home_score_ct = Column(Integer)
+    outs = Column(Integer)
+    daynight = Column(String(1))
+    completion = Column(String(255))
+    forfeit = Column(String(1))
+    protest = Column(String(2))
+    park = Column(String(5))
+    attendance = Column(Integer)
+    game_minutes = Column(Integer)
+    away_linescore = Column(String(20))
+    home_linescore = Column(String(30))
+    away_ab = Column(Integer)
+    away_h = Column(Integer)
+    away_2b = Column(Integer)
+    away_3b = Column(Integer)
+    away_hr = Column(Integer)
+    away_rbi = Column(Integer)
+    away_sh = Column(Integer)
+    away_sf = Column(Integer)
+    away_hbp = Column(Integer)
+    away_bb = Column(Integer)
+    away_ibb = Column(Integer)
+    away_so = Column(Integer)
+    away_sb = Column(Integer)
+    away_cs = Column(Integer)
+    away_gidp = Column(Integer)
+    away_ci = Column(Integer)
+    away_lob = Column(Integer)
+    away_pitchers_used = Column(Integer)
+    away_individual_er = Column(Integer)
+    away_team_er = Column(Integer)
+    away_wp = Column(Integer)
+    away_balks = Column(Integer)
+    away_putouts = Column(Integer)
+    away_assists = Column(Integer)
+    away_errors = Column(Integer)
+    away_passed_balls = Column(Integer)
+    away_double_plays = Column(Integer)
+    away_triple_plays = Column(Integer)
+    home_ab = Column(Integer)
+    home_h = Column(Integer)
+    home_2b = Column(Integer)
+    home_3b = Column(Integer)
+    home_hr = Column(Integer)
+    home_rbi = Column(Integer)
+    home_sh = Column(Integer)
+    home_sf = Column(Integer)
+    home_hbp = Column(Integer)
+    home_bb = Column(Integer)
+    home_ibb = Column(Integer)
+    home_so = Column(Integer)
+    home_sb = Column(Integer)
+    home_cs = Column(Integer)
+    home_gidp = Column(Integer)
+    home_ci = Column(Integer)
+    home_lob = Column(Integer)
+    home_pitchers_used = Column(Integer)
+    home_individual_er = Column(Integer)
+    home_team_er = Column(Integer)
+    home_wp = Column(Integer)
+    home_balks = Column(Integer)
+    home_putouts = Column(Integer)
+    home_assists = Column(Integer)
+    home_errors = Column(Integer)
+    home_passed_balls = Column(Integer)
+    home_double_plays = Column(Integer)
+    home_triple_plays = Column(Integer)
+    hp_ump_id = Column(String(8), ForeignKey('person.key_retro'))
+    hp_ump_name = Column(String(255))
+    b1_ump_id = Column(String(8), ForeignKey('person.key_retro'))
+    b1_ump_name = Column(String(255))
+    b2_ump_id = Column(String(8), ForeignKey('person.key_retro'))
+    b2_ump_name = Column(String(255))
+    b3_ump_id = Column(String(8), ForeignKey('person.key_retro'))
+    b3_ump_name = Column(String(255))
+    lf_ump_id = Column(String(8), ForeignKey('person.key_retro'))
+    lf_ump_name = Column(String(255))
+    rf_ump_id = Column(String(8), ForeignKey('person.key_retro'))
+    rf_ump_name = Column(String(255))
+    away_manager_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_manager_name = Column(String(255))
+    home_manager_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_manager_name = Column(String(255))
+    winning_pitcher_id = Column(String(8), ForeignKey('person.key_retro'))
+    winning_pitcher_name = Column(String(255))
+    losing_pitcher_id = Column(String(8), ForeignKey('person.key_retro'))
+    losing_pitcher_name = Column(String(255))
+    saving_pitcher_id = Column(String(8), ForeignKey('person.key_retro'))
+    saving_pitcher_name = Column(String(255))
+    gwrbi_batter_id = Column(String(8), ForeignKey('person.key_retro'))
+    gwrbi_batter_name = Column(String(255))
+    away_starting_pitcher_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_starting_pitcher_name = Column(String(255))
+    home_starting_pitcher_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_starting_pitcher_name = Column(String(255))
+    away_batter_1_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_batter_1_name = Column(String(255))
+    away_batter_1_pos = Column(Integer)
+    away_batter_2_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_batter_2_name = Column(String(255))
+    away_batter_2_pos = Column(Integer)
+    away_batter_3_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_batter_3_name = Column(String(255))
+    away_batter_3_pos = Column(Integer)
+    away_batter_4_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_batter_4_name = Column(String(255))
+    away_batter_4_pos = Column(Integer)
+    away_batter_5_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_batter_5_name = Column(String(255))
+    away_batter_5_pos = Column(Integer)
+    away_batter_6_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_batter_6_name = Column(String(255))
+    away_batter_6_pos = Column(Integer)
+    away_batter_7_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_batter_7_name = Column(String(255))
+    away_batter_7_pos = Column(Integer)
+    away_batter_8_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_batter_8_name = Column(String(255))
+    away_batter_8_pos = Column(Integer)
+    away_batter_9_id = Column(String(8), ForeignKey('person.key_retro'))
+    away_batter_9_name = Column(String(255))
+    away_batter_9_pos = Column(Integer)
+    home_batter_1_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_batter_1_name = Column(String(255))
+    home_batter_1_pos = Column(Integer)
+    home_batter_2_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_batter_2_name = Column(String(255))
+    home_batter_2_pos = Column(Integer)
+    home_batter_3_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_batter_3_name = Column(String(255))
+    home_batter_3_pos = Column(Integer)
+    home_batter_4_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_batter_4_name = Column(String(255))
+    home_batter_4_pos = Column(Integer)
+    home_batter_5_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_batter_5_name = Column(String(255))
+    home_batter_5_pos = Column(Integer)
+    home_batter_6_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_batter_6_name = Column(String(255))
+    home_batter_6_pos = Column(Integer)
+    home_batter_7_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_batter_7_name = Column(String(255))
+    home_batter_7_pos = Column(Integer)
+    home_batter_8_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_batter_8_name = Column(String(255))
+    home_batter_8_pos = Column(Integer)
+    home_batter_9_id = Column(String(8), ForeignKey('person.key_retro'))
+    home_batter_9_name = Column(String(255))
+    home_batter_9_pos = Column(Integer)
+    additional_info = Column(String(255))
+    acquisition = Column(String(1))
+
+    def __repr__(self):
+        return '<GameLog(game_id = %s, away_score_ct = %i, home_score_ct = %i)>' % \
+        (self.game_id, self.away_score_ct, self.home_score_ct)
+
+
+
 class Event(Base):
     __tablename__ = 'event'
-    game_id = Column(String(12), primary_key = True)
+    game_id = Column(String(12), ForeignKey('game_log.game_id'), primary_key = True)
     event_id = Column(Integer, primary_key = True)
-    away_team_id = Column(String(3))
+    game_date = Column(Date)
+    away_team_id = Column(String(3), ForeignKey('team.cur_fran_id'))
+    home_team_id = Column(String(3), ForeignKey('team.cur_fran_id'))
     inn_ct = Column(Integer)
     bat_home_id = Column(Integer)
     outs_ct = Column(Integer)
@@ -535,27 +904,27 @@ class Event(Base):
     pitch_seq_tx = Column(String(40))
     away_score_ct = Column(Integer)
     home_score_ct = Column(Integer)
-    bat_id = Column(String(8))
+    bat_id = Column(String(8), ForeignKey('person.key_retro'))
     bat_hand_cd = Column(String(1))
-    resp_bat_id = Column(String(8))
-    bat_on_deck_id = Column(String(8))
-    bat_in_hold_id = Column(String(8))
+    resp_bat_id = Column(String(8), ForeignKey('person.key_retro'))
+    bat_on_deck_id = Column(String(8), ForeignKey('person.key_retro'))
+    bat_in_hold_id = Column(String(8), ForeignKey('person.key_retro'))
     resp_bat_hand_cd = Column(String(1))
-    pit_id = Column(String(8))
+    pit_id = Column(String(8), ForeignKey('person.key_retro'))
     pit_hand_cd = Column(String(1))
-    resp_pit_id = Column(String(8))
+    resp_pit_id = Column(String(8), ForeignKey('person.key_retro'))
     resp_pit_hand_cd = Column(String(1))
-    pos2_fld_id = Column(String(8))
-    pos3_fld_id = Column(String(8))
-    pos4_fld_id = Column(String(8))
-    pos5_fld_id = Column(String(8))
-    pos6_fld_id = Column(String(8))
-    pos7_fld_id = Column(String(8))
-    pos8_fld_id = Column(String(8))
-    pos9_fld_id = Column(String(8))
-    base1_run_id = Column(String(8))
-    base2_run_id = Column(String(8))
-    base3_run_id = Column(String(8))
+    pos2_fld_id = Column(String(8), ForeignKey('person.key_retro'))
+    pos3_fld_id = Column(String(8), ForeignKey('person.key_retro'))
+    pos4_fld_id = Column(String(8), ForeignKey('person.key_retro'))
+    pos5_fld_id = Column(String(8), ForeignKey('person.key_retro'))
+    pos6_fld_id = Column(String(8), ForeignKey('person.key_retro'))
+    pos7_fld_id = Column(String(8), ForeignKey('person.key_retro'))
+    pos8_fld_id = Column(String(8), ForeignKey('person.key_retro'))
+    pos9_fld_id = Column(String(8), ForeignKey('person.key_retro'))
+    base1_run_id = Column(String(8), ForeignKey('person.key_retro'))
+    base2_run_id = Column(String(8), ForeignKey('person.key_retro'))
+    base3_run_id = Column(String(8), ForeignKey('person.key_retro'))
     event_tx = Column(String(100))
     leadoff_fl = Column(String(1))
     ph_fl = Column(String(1))
@@ -602,18 +971,18 @@ class Event(Base):
     run1_pk_fl = Column(String(1))
     run2_pk_fl = Column(String(1))
     run3_pk_fl = Column(String(1))
-    run1_resp_pit_id = Column(String(8))
-    run2_resp_pit_id = Column(String(8))
-    run3_resp_pit_id = Column(String(8))
+    run1_resp_pit_id = Column(String(8), ForeignKey('person.key_retro'))
+    run2_resp_pit_id = Column(String(8), ForeignKey('person.key_retro'))
+    run3_resp_pit_id = Column(String(8), ForeignKey('person.key_retro'))
     game_new_fl = Column(String(1))
     game_end_fl = Column(String(1))
     pr_run1_fl = Column(String(1))
     pr_run2_fl = Column(String(1))
     pr_run3_fl = Column(String(1))
-    removed_for_pr_run1_id = Column(String(8))
-    removed_for_pr_run2_id = Column(String(8))
-    removed_for_pr_run3_id = Column(String(8))
-    removed_for_ph_bat_id = Column(String(8))
+    removed_for_pr_run1_id = Column(String(8), ForeignKey('person.key_retro'))
+    removed_for_pr_run2_id = Column(String(8), ForeignKey('person.key_retro'))
+    removed_for_pr_run3_id = Column(String(8), ForeignKey('person.key_retro'))
+    removed_for_ph_bat_id = Column(String(8), ForeignKey('person.key_retro'))
     removed_for_ph_bat_fld_cd = Column(Integer)
     po1_fld_cd = Column(Integer)
     po2_fld_cd = Column(Integer)
@@ -668,7 +1037,7 @@ class Event(Base):
     pa_inplay_strike_ct = Column(Integer)
     pa_other_strike_ct = Column(Integer)
     event_runs_ct = Column(Integer)
-    fld_id = Column(String(8))
+    fld_id = Column(String(8), ForeignKey('person.key_retro'))
     base2_force_fl = Column(String(1))
     base3_force_fl = Column(String(1))
     base4_force_fl = Column(String(1))
@@ -685,105 +1054,25 @@ class Event(Base):
     ass10_fld_cd = Column(Integer)
     unknown_out_exc_fl = Column(String(1))
     uncertain_play_exc_fl = Column(String(1))
+    ### weather ###
+    temperature = Column(Float)
+    heat_index = Column(Float)
+    dew_point = Column(Float)
+    humidity = Column(Float)
+    pressure = Column(Float)
+    visibility = Column(Float)
+    wind_dir = Column(String(5))
+    wind_speed = Column(Float)
+    gust_speed = Column(Float)
+    precipitation = Column(Float)
 
     def __repr__(self):
         return '<Event(game_id = %s, event_id = %i, inning = %i)>' % \
                 (self.game_id, self.event_id, self.inn_ct)
 
-class GameLog(Base):
-    __tablename__ = 'game_log'
-    game_id = Column(String(12), primary_key = True)
-    game_datetime = Column(DateTime)
-    game_dt = Column(String(6))
-    game_ct = Column(Integer)
-    game_dy = Column(String(9))
-    start_game_tm = Column(String(4))
-    dh_fl = Column(String(1))
-    daynight_park_cd = Column(String(1))
-    away_team_id = Column(String(3))
-    home_team_id = Column(String(3))
-    away_start_pit_id = Column(String(8))
-    home_start_pit_id = Column(String(8))
-    base4_ump_id = Column(String(8), default = '')
-    base1_ump_id = Column(String(8), default = '')
-    base2_ump_id = Column(String(8), default = '')
-    base3_ump_id = Column(String(8), default = '')
-    lf_ump_id = Column(String(8), default = '')
-    rf_ump_id = Column(String(8), default = '')
-    attend_park_ct = Column(Integer)
-    scorer_record_id = Column(Integer)
-    translator_record_id = Column(String(50))
-    inputter_record_id = Column(String(50))
-    input_record_ts = Column(String(18))
-    edit_record_ts = Column(String(18))
-    method_record_cd = Column(Integer)
-    pitches_record_cd = Column(Integer)
-    temp_park_ct = Column(Integer)
-    wind_direction_park_cd = Column(Integer)
-    wind_speed_park_ct = Column(Integer)
-    field_park_cd = Column(Integer)
-    precip_park_cd = Column(Integer)
-    sky_park_cd = Column(Integer)
-    minutes_game_ct = Column(Integer)
-    inn_ct = Column(Integer)
-    away_score_ct = Column(Integer)
-    home_score_ct = Column(Integer)
-    away_hits_ct = Column(Integer)
-    home_hits_ct = Column(Integer)
-    away_err_ct = Column(Integer)
-    home_err_ct = Column(Integer)
-    away_lob_ct = Column(Integer)
-    home_lob_ct = Column(Integer)
-    win_pit_id = Column(String(8))
-    lose_pit_id = Column(String(8))
-    save_pit_id = Column(String(8), default = '')
-    gwrbi_bat_id = Column(String(8), default = '')
-    away_lineup1_bat_id = Column(String(8))
-    away_lineup1_fld_cd = Column(Integer)
-    away_lineup2_bat_id = Column(String(8))
-    away_lineup2_fld_cd = Column(Integer)
-    away_lineup3_bat_id = Column(String(8))
-    away_lineup3_fld_cd = Column(Integer)
-    away_lineup4_bat_id = Column(String(8))
-    away_lineup4_fld_cd = Column(Integer)
-    away_lineup5_bat_id = Column(String(8))
-    away_lineup5_fld_cd = Column(Integer)
-    away_lineup6_bat_id = Column(String(8))
-    away_lineup6_fld_cd = Column(Integer)
-    away_lineup7_bat_id = Column(String(8))
-    away_lineup7_fld_cd = Column(Integer)
-    away_lineup8_bat_id = Column(String(8))
-    away_lineup8_fld_cd = Column(Integer)
-    away_lineup9_bat_id = Column(String(8))
-    away_lineup9_fld_cd = Column(Integer)
-    home_lineup1_bat_id = Column(String(8))
-    home_lineup1_fld_cd = Column(Integer)
-    home_lineup2_bat_id = Column(String(8))
-    home_lineup2_fld_cd = Column(Integer)
-    home_lineup3_bat_id = Column(String(8))
-    home_lineup3_fld_cd = Column(Integer)
-    home_lineup4_bat_id = Column(String(8))
-    home_lineup4_fld_cd = Column(Integer)
-    home_lineup5_bat_id = Column(String(8))
-    home_lineup5_fld_cd = Column(Integer)
-    home_lineup6_bat_id = Column(String(8))
-    home_lineup6_fld_cd = Column(Integer)
-    home_lineup7_bat_id = Column(String(8))
-    home_lineup7_fld_cd = Column(Integer)
-    home_lineup8_bat_id = Column(String(8))
-    home_lineup8_fld_cd = Column(Integer)
-    home_lineup9_bat_id = Column(String(8), default = '')
-    home_lineup9_fld_cd = Column(Integer)
-    away_finish_pit_id = Column(String(8), default = '')
-    home_finish_pit_id = Column(Integer)
-
-    def __repr__(self):
-        return '<GameLog(game_id = %s, away_score_ct = %i, home_score_ct = %i)>' % \
-        (self.game_id, self.away_score_ct, self.Home_score_ct)
-
 class Sub(Base):
     __tablename__ = 'sub'
-    game_id = Column(String(12), primary_key = True)
+    game_id = Column(String(12), ForeignKey('game_log.game_id'), primary_key = True)
     sub_id = Column(String(8), primary_key = True)
     sub_fld_cd = Column(Integer, primary_key = True)
     event_id = Column(Integer, primary_key = True)
@@ -798,6 +1087,121 @@ class Sub(Base):
         return '<Sub(game_id = %s, event_id = %i, inning = %i, remove = %s)>' % \
         (self.game_id, self.event_id, self.inn_ct, self.removed_id)
 
+class Team(Base):
+    __tablename__ = 'team'
+    cur_fran_id = Column(String(3), primary_key = True)
+    start_date = Column(Date, primary_key = True)
+    fran_id = Column(String(3))
+    lg = Column(String(3))
+    div = Column(String(3))
+    location = Column(String(15))
+    name = Column(String(15))
+    alt_name = Column(String(30))
+    end_date = Column(Date)
+    city = Column(String(15))
+    state = Column(String(2))
+
+    def __repr__(self):
+        return '<Team(team_id = %s, city = %s, start = %i, end = %s)>' % \
+        (self.fran_id, self.city, str(self.start_date), str(self.end_date))
+
+class Person(Base):
+    __tablename__ = 'person'
+    key_person = Column(String(8), primary_key = True)
+    key_uuid = Column(String(36))
+    key_retro = Column(String(8))
+    key_mlbam = Column(Integer)
+    key_bbref = Column(String(9))
+    key_bbref_minors = Column(String(12))
+    key_fangraphs = Column(Integer)
+    key_npb = Column(Integer)
+    key_sr_nfl = Column(String(8))
+    key_sr_nba = Column(String(10))
+    key_sr_nhl = Column(String(9))
+    key_findagrave = Column(Integer)
+    name_last = Column(String(20))
+    name_first = Column(String(20))
+    name_given = Column(String(20))
+    name_suffix = Column(String(20))
+    name_matrilineal = Column(String(20))
+    name_nick = Column(String(50))
+    birth_year = Column(Integer)
+    birth_month = Column(Integer)
+    birth_day = Column(Integer)
+    death_year = Column(Integer)
+    death_month = Column(Integer)
+    death_day = Column(Integer)
+    pro_played_first = Column(Integer)
+    pro_played_last = Column(Integer)
+    mlb_played_first = Column(Integer)
+    mlb_played_last = Column(Integer)
+    col_played_first = Column(Integer)
+    col_played_last = Column(Integer)
+    pro_managed_first = Column(Integer)
+    pro_managed_last = Column(Integer)
+    mlb_managed_first = Column(Integer)
+    mlb_managed_last = Column(Integer)
+    col_managed_first = Column(Integer)
+    col_managed_last = Column(Integer)
+    pro_umpired_first = Column(Integer)
+    pro_umpired_last = Column(Integer)
+    mlb_umpired_first = Column(Integer)
+    mlb_umpired_last = Column(Integer)
+
+    @hybrid_property
+    def birth_date(self):
+        if self.birth_year is not None and self.birth_month is not None and self.birth_date is not None:
+            return dt.date(self.birth_year, self.birth_month, self.birth_day)
+        else:
+            return None
+
+    @hybrid_property
+    def age(self):
+        if self.birth_year is not None and self.birth_month is not None and self.birth_date is not None:
+            today = dt.date.today()
+            birthday = dt.date(self.birth_year, self.birth_month, self.birth_day)
+            return relativedelta(today, birthday).years
+        else:
+            return None
+
+    def __repr__(self):
+        return '<Person(key_person = %s, first = %s, last = %s)>' % \
+        (self.key_person, self.name_first, self.name_last)
+
+class Park(Base):
+    __tablename__ = 'park'
+    park_id = Column(String(5), primary_key = True)
+    name = Column(String(40))
+    alias = Column(String(100))
+    city = Column(String(20))
+    state = Column(String(15))
+    country = Column(String(2))
+    venue_id = Column(Integer)
+
+    def __repr__(self):
+        return '<Park(park_id = %s, name = %s, city = %s)>' % \
+        (self.park_id, self.name, self.city)
+
+class Weather(Base):
+    __tablename__ = 'weather'
+    gid = Column(String(26), primary_key = True)
+    date_time = Column(DateTime, primary_key = True)
+    venue_id = Column(Integer)
+    park_id = Column(String(5), ForeignKey('park.park_id'))
+    temperature = Column(Float)
+    heat_index = Column(Float)
+    dew_point = Column(Float)
+    humidity = Column(Float)
+    pressure = Column(Float)
+    visibility = Column(Float)
+    wind_dir = Column(String(5))
+    wind_speed = Column(Float)
+    gust_speed = Column(Float)
+    precipitation = Column(Float)
+
+    def __repr__(self):
+        return '<Weather(gid = %s, time = %s, temperature = %.1f)>' % \
+        (self.gid, self.date_time.strftime('%H:%M'), self.temperature)
 
 def create_db(engine):
-    Base.metadata.create_all(bind = engine)
+    Base.metadata.create_all(engine)
