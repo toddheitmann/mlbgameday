@@ -1,25 +1,25 @@
-# MLBGame Data
+# MLBGameDay
 
-A python API for baseball data working with data from MLBAM Gameday [data](http://gd2.mlb.com/components/game/mlb/), [Baseball Savant](https://baseballsavant.mlb.com), and [Retrosheet](http://www.retrosheet.org). Stores data using [SQLAlchemy](https://www.sqlalchemy.org). Returns data in [PANDAS](http://pandas.pydata.org) data frames.
+A python API for baseball data working with data sources from MLBAM Gameday [data](http://gd2.mlb.com/components/game/mlb/), [Baseball Savant](https://baseballsavant.mlb.com), and [Retrosheet](http://www.retrosheet.org). Stores data using [SQLAlchemy](https://www.sqlalchemy.org). Returns data in [PANDAS](http://pandas.pydata.org) data frames.
 
 Data use is always subject to licenses by [MLB Advanced Media License](http://gd2.mlb.com/components/copyright.txt), [retrosheet](http://www.retrosheet.org/notice.txt), and the [project license](https://github.com/toddheitmann/mlbgameday/blob/master/LICENSE).
 
 ## Status
 
-This currently ***does not*** work. If you're curious about using MLBAM gameday data, the best source is [PitchRx](https://github.com/cpsievert/pitchRx). Obviously, it's in R, so you'll need to check out learning R, or find another option if python is your thing.
+This currently ***partially*** works. Expect continued updates and changes to database structure and data models. If you're curious about using MLBAM gameday data, the best source is [PitchRx](https://github.com/cpsievert/pitchRx). Obviously, it's in R, so you'll need to check out learning R, or find another option if python is your thing.
 
 ### Goals
 
 The project has two simple main goals:
 
-- Provide a database storage for gameday information using [SQLAlchemy](https://www.sqlalchemy.org) in sqlite format.
-- Serve this data back in [PANDAS](http://pandas.pydata.org) dataframes for further analysis.
+- Provide a database storage for baseball data using [SQLAlchemy](https://www.sqlalchemy.org).
+- Serve this data back for analysis in dataframes using [PANDAS](http://pandas.pydata.org).
 
 ### Roadmap
 
 Right now, I see three main paths to bring this project online, reading and storing downloaded data, creating the database structure, and serving queries in dataframes:
 
-- [ ] Using Gameday XML data
+- [ ] *Using Gameday XML data*
 
   - [x] Store XML files
 
@@ -29,17 +29,19 @@ Right now, I see three main paths to bring this project online, reading and stor
 
   - [x] Format XML files for database insertion
 
-  - [ ] Option to delete files after inserting into a database
+  - [x] Option to delete files after inserting into a database
 
-- [ ] Using Baseball Savant data
+- [x] *Using Baseball Savant data*
 
   - [x] Store and Parse CSV files
 
-  - [ ] Update CSV files
+  - [x] Delete files after inserting into a database
 
-  - [ ] Option to delete files after inserting into a database
+  - [x] Insert Into database
 
-- [ ] Using Retrosheet data
+  - [x] Update Baseball Savant Trajectory Data
+
+- [ ] *Using Retrosheet data*
 
   - [x] Download event files
 
@@ -55,13 +57,13 @@ Right now, I see three main paths to bring this project online, reading and stor
 
     - [ ] Linux: Provide installation instructions
 
-  - [ ] Store data in database
+  - [x] Store data in database
 
-  - [ ] Update database with new data
+  - [x] Update database with new data
 
-  - [ ] Delete files after insertion
+  - [x] Delete files after insertion
 
-- [ ] Create and Maintain database
+- [ ] *Create and Maintain Database*
 
   - [x] Create database structure
 
@@ -71,9 +73,9 @@ Right now, I see three main paths to bring this project online, reading and stor
 
   - [ ] Update database
 
-  - [ ] Create filters and wrappers for joins
+  - [ ] Join different databases (MLBGameDay, Baseball Savant, Retrosheet)
 
-- [ ] PANDAS integration
+- [ ] *PANDAS integration*
 
  - [ ] Serve initial queries into dataframes
 
@@ -90,8 +92,10 @@ While getting initial functionality, I hope to provide added support for:
 
 ### Thank You
 
-Many thanks to MLB Advanced Media for making gameday and pitchf/x data public.
+Thanks to MLB Advanced Media for making gameday and pitchf/x data public.
 
-Also, many thanks to all those who support and add to Retrosheet!
+Thank you [Daren Willman](https://twitter.com/darenw) for creating [baseball savant](https://baseballsavant.mlb.com).
+
+Many thanks to all those who support and add to Retrosheet!
 
 The information used here was obtained free of charge from and is copyrighted by Retrosheet.  Interested parties may contact Retrosheet at "www.retrosheet.org".

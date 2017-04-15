@@ -6,7 +6,6 @@ http://gd2.mlb.com/components/copyright.txt
 import datetime as dt
 import time
 import pandas as pd
-# from sqlalchemy import distinct
 from sqlalchemy.orm import aliased
 from sqlalchemy import update
 
@@ -47,7 +46,7 @@ def update_gameday(delete_files = False):
     # if delete_files:
     #     download.remove_mlbam_downloads()
 
-def update_trajectory(delete_files = False):
+def update_trajectory():
 
     engine = database.get_engine()
     session = database.get_session()
@@ -73,11 +72,10 @@ def update_trajectory(delete_files = False):
         df = parse.get_trajectory_df(year)
         df.to_sql('trajectory', engine, if_exists = 'append', index = False)
 
-    if delete_files:
-        download.remove_trajectory_downloads()
+    download.remove_trajectory_downloads()
 
 
-def update_retrosheet(delete_files = False):
+def update_retrosheet():
 
     engine = database.get_engine()
     session = database.get_session()
@@ -127,33 +125,36 @@ def update_retrosheet(delete_files = False):
 
     session.close()
 
-    if delete_files:
-        download.remove_retrosheet_downloads()
+    download.remove_retrosheet_downloads()
 
 def update_weather():
 
-    parse.get_weather_data()
+    # parse.get_weather_data()
 
-    # engine = database.get_engine()
-    # session = database.get_session()
-    #
-    # data_models = [models.HIP, models.AtBat, models.Action, models.Pitch, models.Runner, models.Pickoff]
-    #
-    # gids = session.query(models.Game.gid).filter\
-    #         (models.Trajectory.temperature == None, models.Game.game_pk == models.Trajectory.game_pk).all()
-    # for m in data_models:
-    #     gids += session.query(m.gid).filter(m.temperature == None).all()
-    # gids = list(set(gids))
-    #
+    engine = database.get_engine()
+    session = database.get_session()
+
+    gids = session.query(models.Game.gid).filter\
+            (models.Trajectory.temperature == None, models.Game.game_pk == models.Trajectory.game_pk).all()
+
+    gids += session.query(models.HIP.gid).filter(models.HIP.temperature == None).all()
+
+    data_models = [models.AtBat, models.Action, models.Pitch, models.Runner, models.Pickoff]
+    for m in data_models:
+        gids += session.query(m.gid).filter(m.temperature == None).all()
+    gids = list(set(gids))
+
     # # for gid in gids:
-    # gid = gids[0][0]
-    #
-    # weather_query = session.query(models.Weather).filter(models.Weather.gid == gid)
-    # weather = pd.read_sql(weather_query.statement, weather_query.session.bind)
-    #
-    # date_times = []
-    # for m in data_models:
-    #     date_times += session.query(m.date_time).filter((m.temperature == None) & (m.gid == gid)).all()
+    gid = gids[0][0]
+
+    weather = session.query(models.Weather).filter(models.Weather.gid == gid)
+    weather = pd.read_sql(weather.statement, weather.session.bind)
+
+    date_times = []
+    for m in data_models:
+        date_times += session.query(m.date_time).filter((m.temperature == None) & (m.gid == gid)).all()
+
+    print(date_times)
 
 def update_event_keys():
 
@@ -162,17 +163,15 @@ def update_event_keys():
     batter = aliased(models.Person, name = 'batter')
     pitcher = aliased(models.Person, name = 'pitcher')
 
-    ### add retro_gid to trajectory ###
-
     ### add retro_event to hip ###
-    events = session.query(models.Trajectory, models.Event.event_id).\
-                filter(models.Trajectory.pitcher == pitcher.key_mlbam).\
+    events = session.query(models.HIP, models.Event.event_id).\
+                filter(models.HIP.pitcher == pitcher.key_mlbam).\
                 filter(models.Event.pit_id == pitcher.key_retro).\
-                filter(models.Trajectory.batter == batter.key_mlbam).\
+                filter(models.HIP.batter == batter.key_mlbam).\
                 filter(models.Event.bat_id == batter.key_retro).\
-                filter(models.Trajectory.retro_gid == models.Event.game_id).\
-                filter(models.Trajectory.inning == models.Event.inn_ct).\
-                filter(models.Trajectory.retro_event_id == None).all()
+                filter(models.HIP.retro_gid == models.Event.game_id).\
+                filter(models.HIP.inning == models.Event.inn_ct).\
+                filter(models.HIP.retro_event_id == None).all()
     for row in events:
         row[0].retro_event_id = row[1]
     session.commit()
@@ -186,6 +185,7 @@ def update_event_keys():
                 filter(models.AtBat.retro_gid == models.Event.game_id).\
                 filter(models.AtBat.inning == models.Event.inn_ct).\
                 filter(models.AtBat.retro_event_id == None).all()
+
     for row in events:
         row[0].retro_event_id = row[1]
     session.commit()
@@ -199,8 +199,19 @@ def update_event_keys():
                 filter(models.Pitch.retro_gid == models.Event.game_id).\
                 filter(models.Pitch.inning == models.Event.inn_ct).\
                 filter(models.Pitch.retro_event_id == None).all()
+
     for row in events:
         row[0].retro_event_id = row[1]
+    session.commit()
+
+    ### add retro_gid to trajectory ###
+
+    games = session.query(models.Trajectory, models.Game.retro_gid).\
+                filter(models.Trajectory.game_pk == models.Game.game_pk).\
+                filter(models.Trajectory.retro_gid == None).all()
+
+    for row in games:
+        row[0].retro_gid = row[1]
     session.commit()
 
     ### add retro_event_id to trajectory ###
@@ -212,20 +223,20 @@ def update_event_keys():
                 filter(models.Trajectory.retro_gid == models.Event.game_id).\
                 filter(models.Trajectory.inning == models.Event.inn_ct).\
                 filter(models.Trajectory.retro_event_id == None).all()
+
     for row in events:
         row[0].retro_event_id = row[1]
     session.commit()
 
-
 def update(delete_files = False):
 
-    update_gameday(delete_files = delete_files)
+    # update_gameday(delete_files = delete_files)
+    #
+    # update_trajectory()
 
-    update_trajectory(delete_files = delete_files)
+    # update_retrosheet()
 
-    update_retrosheet(delete_files = delete_files)
-
-    update_event_keys()
+    # update_event_keys()
 
     update_weather()
 

@@ -419,7 +419,7 @@ def get_retro_event_df(year):
 
     working_dir = join(dirname(__file__), 'data', 'event', str(year))
     if isdir(working_dir):
-        args  = ' -f 0-96 -x 0-60 -n -y %i *.ev*' % year
+        args  = ' -f 0-96 -x 0-60 -n -y %i *.EV*' % year
         cmd = event_exe + args
         output = subprocess.check_output(args = cmd, cwd = working_dir, shell = True)
         df = pd.read_csv(BytesIO(output), low_memory = False)
@@ -485,13 +485,13 @@ def get_park_df():
         df = pd.DataFrame()
     return df
 
-def decimal_search(search_string, left, right):
-    regex = r'\d{%s}\.\d{%s}' % (left, right)
+def decimal_search(search_string):
+    regex = r'\d+.\d+'
     temp = re.compile(regex).findall(search_string)
     if len(temp) > 0:
         return temp[0]
     else:
-        return 0
+        return None
 
 def get_weather_data():
 
@@ -541,29 +541,33 @@ def get_weather_data():
                 else:
                     time_str = time_str.group()
                 date_time = dt.datetime.strptime(date_str + time_str, '%Y_%m_%d_%I:%M %p')
-                temp = decimal_search(td[1], '2', '1')
-                heat_index = decimal_search(td[2], '2', '1')
-                dew_point = decimal_search(td[3], '2', '1')
-                humidity =decimal_search(td[4], '2', '0')
-                pressure = decimal_search(td[5], '2', '2')
-                visibility = decimal_search(td[6], '2', '1')
-                wind_dir = td[7].split('>')[-1].replace('\\n', '').replace(' ', '').replace('-', '')
-                wind_speed = decimal_search(td[8], '1', '1')
+                temperature = decimal_search(td[1])
+                heat_index = decimal_search(td[2])
+                dew_point = decimal_search(td[3])
+                humidity =decimal_search(td[4])
+                pressure = decimal_search(td[5])
+                visibility = decimal_search(td[6])
+                wind_dir_text = td[7].split('>')[-1].replace('\\n', '').replace(' ', '').replace('-', '')
+                if wind_dir_text in constants.WIND_DIR:
+                    wind_dir = constants.WIND_DIR[wind_dir_text]
+                else:
+                    wind_dir = None
+                wind_speed = decimal_search(td[8])
                 if wind_speed is None:
-                    wind_speed = decimal_search(td[8], '2', '1')
-                gust_speed = decimal_search(td[8], '1', '1')
+                    wind_speed = decimal_search(td[8])
+                gust_speed = decimal_search(td[8])
                 if gust_speed is None:
-                    gust_speed = decimal_search(td[8], '2', '1')
-                precip = decimal_search(td[9], '1', '2')
+                    gust_speed = decimal_search(td[8])
+                precip = decimal_search(td[9])
 
-                data.append([gid, venue, park_id, date_time, temp, heat_index, dew_point, humidity, pressure, visibility, wind_dir, wind_speed, gust_speed, precip])
+                data.append([gid, venue, park_id, date_time, temperature, heat_index, dew_point, humidity, pressure, visibility, wind_dir, wind_speed, gust_speed, precip])
 
             columns = ['gid', 'venue_id', 'park_id', 'date_time', 'temperature', 'heat_index', 'dew_point', 'humidity', 'pressure', 'visibility', 'wind_dir', 'wind_speed', 'gust_speed', 'precipitation']
 
             game_df = pd.DataFrame(data, columns = columns).drop_duplicates(subset = ['gid', 'date_time'])
             df = df.append(game_df)
         if len(df) > 0:
-            df[df.heat_index == 0, 'heat_index'] = df[df.heat_index == 0].temperature
+            df.loc[df.heat_index.isnull(), 'heat_index'] = df[df.heat_index.isnull()].temperature
             df.to_sql('weather', engine, if_exists = 'append', index = False)
 
     session.close()
