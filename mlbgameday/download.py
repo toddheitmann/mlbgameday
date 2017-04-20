@@ -119,7 +119,7 @@ def get_attributes(dictionary, xml_node, name):
     'home_team_so', 'away_team_so', 'series_num', 'ser_home_nbr', 'ser_games', 'scheduled_innings',
     # player attributes
     'id', 'game_pk', 'num', 'team_id', 'parent_team_id', 'hr', 'rbi', 'wins', 'losses',
-    'event_num', 'home_team_runs', 'away_team_runs','o']
+    'event_num', 'home_team_runs', 'away_team_runs', 'o']
 
     for attr in xml_node.attrib:
         if attr == 'sv_id':
@@ -128,12 +128,9 @@ def get_attributes(dictionary, xml_node, name):
             else:
                 dictionary['sv_id'] = None
         elif attr in attr_float:
-            if '-' not in xml_node.attrib[attr]:
-                try:
-                    dictionary[attr] = float(xml_node.attrib[attr])
-                except:
-                    dictionary[attr] = None
-            else:
+            try:
+                dictionary[attr] = float(xml_node.attrib[attr])
+            except:
                 dictionary[attr] = None
         elif attr in attr_int:
             if attr == 'rbi' and name == 'runner':
@@ -164,36 +161,44 @@ def get_games(game_date):
     data = download_miniscoreboard(game_date)
     root = ET.fromstring(data)
     games = []
-    for game in root:
-        if game.tag == 'game':
-            game_info = {}
-            game_info = get_attributes(game_info, game, 'game')
-            game_info['gid'] = game_info.pop('gameday_link', None)
-            game_info['game_date'] = game_date
+    for game_node in root:
+        if game_node.tag == 'game':
+            game = {}
+            game = get_attributes(game, game_node, 'game')
+            game['gid'] = game.pop('gameday_link', None)
+            game['game_date'] = game_date
             date_string = game_date.strftime('%Y%m%d')
-            local_time_str = date_string + game_info['home_time'] + game_info['home_ampm']
-            game_info['datetime_local'] = dt.datetime.strptime(local_time_str, '%Y%m%d%I:%M%p')
-            if ':' in game_info['time']:
-                et_time_str = date_string + game_info['time'] + game_info['ampm']
-                game_info['datetime_et'] = dt.datetime.strptime(et_time_str, '%Y%m%d%I:%M%p')
+            if len(game['home_time']) == 4:
+                # errors with makeup games showing AM for PM games
+                # len(3:33) == 4 implies game is in PM
+                local_time_str = date_string + game['home_time'] + 'PM'
             else:
-                game_info['datetime_et'] = None
+                local_time_str = date_string + game['home_time'] + game['home_ampm']
+            game['datetime_local'] = dt.datetime.strptime(local_time_str, '%Y%m%d%I:%M%p')
+            if ':' in game['time']:
+                et_time_str = date_string + game['time'] + game['ampm']
+                game['datetime_et'] = dt.datetime.strptime(et_time_str, '%Y%m%d%I:%M%p')
+            else:
+                game['datetime_et'] = None
             for p in pop_list:
-                game_info.pop(p, None)
-            if 'original_date' in game_info:
-                game_info['original_date'] = dt.datetime.strptime(game_info['original_date'], '%Y/%m/%d').date()
-            if 'resume_time_date' in game_info:
-                game_info['resume_time_date'] = dt.datetime.strptime(game_info['resume_time_date'], '%Y/%m/%d %H:%M')
-            if 'resume_date' in game_info:
-                game_info['resume_date'] = dt.datetime.strptime(game_info['resume_date'], '%Y/%m/%d').date()
-            if 'home_code' in game_info:
-                game_info['home_code'] = game_info['home_code'].upper()
-            if 'away_code' in game_info:
-                game_info['away_code'] = game_info['away_code'].upper()
-            if game_date == dt.datetime.strptime(game_info['gid'][:10], '%Y_%m_%d').date():
-                game_number = str(int(game_info['gid'][-1]) - 1)
-                game_info['retro_gid'] = game_info['home_code'] + game_date.strftime('%Y%m%d') + game_number
-                games.append(game_info)
+                game.pop(p, None)
+            if 'original_date' in game:
+                game['original_date'] = dt.datetime.strptime(game['original_date'], '%Y/%m/%d').date()
+            if 'resume_time_date' in game:
+                game['resume_time_date'] = dt.datetime.strptime(game['resume_time_date'], '%Y/%m/%d %H:%M')
+            if 'resume_date' in game:
+                game['resume_date'] = dt.datetime.strptime(game['resume_date'], '%Y/%m/%d').date()
+            if 'home_code' in game:
+                game['home_code'] = game['home_code'].upper()
+            if 'away_code' in game:
+                game['away_code'] = game['away_code'].upper()
+            if game_date == dt.datetime.strptime(game['gid'][:10], '%Y_%m_%d').date():
+                game_number = str(int(game['gid'][-1]) - 1)
+                game['retro_gid'] = game['home_code'] + game_date.strftime('%Y%m%d') + game_number
+                game['year'] = game['datetime_local'].year
+                game['month'] = game['datetime_local'].month
+                game['day'] = game['datetime_local'].day
+                games.append(game)
     return games
 
 def update_miniscoreboard(start_date = None, end_date = None):
@@ -385,5 +390,4 @@ def download_weather_table(gid, venue):
     url = urlopen(url_format)
     response = repr(url.read())
     time.sleep(1)
-    
     return response

@@ -174,3 +174,58 @@ WIND_DIR = {
     'NW': 315,
     'NNW': 337.5
 }
+
+RETRO_EVENT_CD = {
+    0: 'NA',
+    1: 'NA',
+    2: 'OUT',
+    3: 'K',
+    4: 'SB',
+    5: 'DI',
+    6: 'CS',
+    7: 'PE',
+    8: 'PO',
+    9: 'WP',
+    10: 'PB',
+    11: 'BALK',
+    12: 'OA',
+    13: 'FE',
+    14: 'BB',
+    15: 'IBB',
+    16: 'HBP',
+    17: 'INT',
+    18: 'E',
+    19: 'FC',
+    20: 'S',
+    21: 'D',
+    22: 'T',
+    23: 'HR',
+    24: 'NA'
+}
+
+RETRO_EVENT_DES = {
+    0: 'Unknown',
+    1: 'None',
+    2: 'Strikeout',
+    4: 'Stolen Base',
+    5: 'Defensive indifference',
+    6: 'Caught Stealing',
+    7: 'Pickoof Error',
+    8: 'Pickoff',
+    9: 'Wild Pitch',
+    10: 'Passed Ball',
+    11: 'Balk',
+    12: 'Other Advance - Out Advancing',
+    13: 'Foul Error',
+    14: 'Walk',
+    15: 'Intentional Walk',
+    16: 'Hit By Pitch',
+    17: 'Interference',
+    18: 'Error',
+    19: 'Fielder Choice',
+    20: 'Single',
+    21: 'Double',
+    22: 'Triple',
+    23: 'Home Run',
+    24: 'Missing Play'
+}

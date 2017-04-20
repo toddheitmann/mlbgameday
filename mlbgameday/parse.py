@@ -7,6 +7,7 @@ import gzip
 from os import listdir
 from os.path import isfile, isdir, join, dirname
 import datetime as dt
+import pytz
 import xml.etree.ElementTree as ET
 import pandas as pd
 from io import BytesIO
@@ -58,14 +59,36 @@ def get_players(gid, retro_gid, game_pk, game_date):
     return {'players': players, 'coaches': coaches, 'umpires': umpires}
 
 def get_hip(gid, retro_gid, game_date, game_pk, venue_id):
-    data = download.download_gid_file(gid, 'inning_hip.xml')
+
+    data = download.download_gid_file(gid, 'inning_hit.xml')
     root = ET.fromstring(data)
     hips = []
     hip_nodes = root.findall('hip')
+    unique_strings = []
+
     for node in hip_nodes:
-        hip = {'gid': gid, 'retro_gid': retro_gid, 'game_date': game_date, 'game_pk': game_pk, 'venue_id': venue_id}
+        hip = {'gid': gid, 'retro_gid': retro_gid, 'game_date': game_date, 'year': game_date.year, 'month': game_date.month, 'day': game_date.day, 'game_pk': game_pk, 'venue_id': venue_id}
         hip = download.get_attributes(hip, node, 'hip')
-        hips.append(hip)
+
+        ### check for duplicate hip values when scoring changed to error ###
+        ### example file: gid_2016_02_29_bocbbc_bosmlb_1/inning/inning_hit.xml ###
+        ### example file: 2016_03_19_milmlb_anamlb_1_405395_503449_3
+
+        unique_check = '%s_%s_%s_%s' % (gid, hip['batter'], hip['pitcher'], hip['inning'])
+        if unique_check in unique_strings:
+            last = hips[-1]
+            last_check = '%s_%s_%s_%s' % (gid, hip['batter'], hip['pitcher'], hip['inning'])
+            if last_check == unique_check:
+                del hips[-1]
+                hips.append(hip)
+            else:
+                ### sometimes duplicate gid batter, pitcher, inning, but different atbat ###
+                ### example file: gid_2016_03_19_milmlb_anamlb_1/inning/inning_hit.xml ###
+                hips.append(hip)
+        else:
+            hips.append(hip)
+            unique_strings.append(unique_check)
+
     return hips
 
 def get_base_state(bases):
@@ -94,7 +117,22 @@ def get_base_state(bases):
                 base_state = '000'
     return base_state
 
-def get_events(gid, retro_gid, game_pk, venue_id, game_date):
+def get_local_time(date_time_gmt, time_zone):
+    local_date_time = pytz.timezone('GMT').localize(date_time_gmt)
+    if time_zone == 'ET':
+        return local_date_time.astimezone(pytz.timezone('US/Eastern'))
+    elif time_zone == 'CT':
+        return local_date_time.astimezone(pytz.timezone('US/Central'))
+    elif time_zone == 'MST':
+        return local_date_time.astimezone(pytz.timezone('US/Mountain'))
+    elif time_zone == 'MT':
+        return local_date_time.astimezone(pytz.timezone('US/Mountain'))
+    elif time_zone == 'PT':
+        return local_date_time.astimezone(pytz.timezone('US/Pacific'))
+    else:
+        return None
+
+def get_events(gid, retro_gid, game_pk, venue_id, game_date, time_zone):
     """Returns event dictionary list for specificed game and venue"""
 
     ### setup game variables ###
@@ -134,21 +172,28 @@ def get_events(gid, retro_gid, game_pk, venue_id, game_date):
             inning_node = inning.find(half)
             if inning_node is not None:
                 for node in inning_node:
-                    event = {'gid': gid, 'retro_gid': retro_gid, 'game_date': game_date, 'game_pk': game_pk, 'venue_id': venue_id, 'inning_topbot': inning_topbot, 'inning': inning_number, 'game_event_number': game_event_number, 'umpire': home_umpire, 'catcher': catcher[inning_topbot] ,'start_outs': outs}
+                    event = {'gid': gid, 'retro_gid': retro_gid, 'game_date': game_date, 'year': game_date.year, 'month': game_date.month, 'day': game_date.day, 'game_pk': game_pk, 'venue_id': venue_id, 'inning_topbot': inning_topbot, 'inning': inning_number, 'game_event_number': game_event_number, 'umpire': home_umpire, 'catcher': catcher[inning_topbot], 'start_outs': outs}
                     base_state = get_base_state(bases)
                     event['start_base_state'] = base_state
                     event['start_out_base_state'] = str(outs) + base_state
                     for base in bases:
                         event['start_' + base] = bases[base]
+                    event.pop('start_', None)
                     for run in runs:
                         event['start_' + run] = runs[run]
-                    event.pop('start_', None)
 
                     if node.tag == 'atbat':
                         ### parse atbat node ###
                         atbat = dict(event)
                         atbat['event_type'] = 'atbat'
                         atbat = download.get_attributes(atbat, node, 'atbat')
+                        if len(atbat['start_tfs_zulu']) == 20:
+                            atbat['start_tfs_zulu'] = dt.datetime.strptime(atbat['start_tfs_zulu'], '%Y-%m-%dT%H:%M:%SZ')
+                            atbat['datetime'] = get_local_time(atbat['start_tfs_zulu'], time_zone)
+                        else:
+                            atbat['start_tfs_zulu'] = None
+                            atbat['datetime'] = None
+
                         event['pitcher'] = atbat['pitcher']
                         event['batter'] = atbat['batter']
 
@@ -162,6 +207,16 @@ def get_events(gid, retro_gid, game_pk, venue_id, game_date):
                                 pitch = dict(event)
                                 pitch['game_pitch_count'] = game_pitch_count
                                 pitch = download.get_attributes(pitch, child, 'pitch')
+                                if len(pitch['tfs_zulu']) == 20:
+                                    pitch['tfs_zulu'] = dt.datetime.strptime(pitch['tfs_zulu'], '%Y-%m-%dT%H:%M:%SZ')
+                                    pitch['datetime'] = get_local_time(pitch['tfs_zulu'], time_zone)
+                                else:
+                                    pitch['tfs_zulu'] = None
+                                    pitch['datetime'] = None
+                                if 'Foul' in pitch['des'] or 'In play' in pitch['des'] or 'Swinging' in pitch['des'] or 'Missed Bunt' == pitch['des']:
+                                    pitch['swing'] = 1
+                                else:
+                                    pitch['swing'] = 0
                                 ### add base state ###
                                 base_state = get_base_state(bases)
                                 for base in bases:
@@ -181,39 +236,47 @@ def get_events(gid, retro_gid, game_pk, venue_id, game_date):
                                 ### adjust changing base state ###
                                 if c + 1 == len(node):
                                     ### occurs at this atbat ###
-                                    bases[runner['start']] = None
                                     bases[runner['end']] = runner['runner_id']
-                                else:
-                                    if node[c + 1] == 'runner':
-                                        ### occurs at this atbat ###
+                                    if bases[runner['start']] == runner['runner_id']:
                                         bases[runner['start']] = None
-                                        bases[runner['end']] = runner['runner_id']
-                                    else:
+                                else:
+                                    ### check to see if pitch occurs after runner event ###
+                                    prev_action = False
+                                    for r in range(c + 1, len(node)):
+                                        if node[r].tag == 'pitch':
+                                            prev_action = True
+                                            break
+
+                                    if prev_action:
                                         ### occurs at previous action node ###
 
-                                        ### NEED TO ADJUST AT BAT OUTS FOR CAUGHT STEALING ###
-
-                                        bases[runner['start']] = None
+                                        ### update start bases ###
                                         bases[runner['end']] = runner['runner_id']
-                                        atbat['start_' + runner['start']] = None
-                                        atbat['start_' + runner['end']] = runner['runner_id']
-                                        event['start_' + runner['start']] = None
-                                        event['start_' + runner['end']] = runner['runner_id']
-                                        events[-1]['end_' + runner['start']] = None
-                                        events[-1]['end_' + runner['end']] = runner['runner_id']
+                                        if bases[runner['start']] == runner['runner_id']:
+                                            bases[runner['start']] = None
+                                            events[-1]['start_' + runner['start']] = None
+                                            atbat['start_' + runner['start']] = None
+
+                                        ### update previous event ###
                                         events[-1]['pitcher'] = atbat['pitcher']
+                                        events[-1]['start_out_base_state'] = str(events[-1]['start_outs']) + events[-1]['start_base_state']
+                                        events[-1]['end_' + runner['end']] = runner['runner_id']
+                                        events[-1]['end_base_state'] = get_base_state(bases)
+                                        events[-1]['end_out_base_state'] = str(events[-1]['end_outs']) + events[-1]['end_base_state']
+
+                                        ### update atbat ###
+                                        atbat['start_base_state'] = get_base_state(bases)
+                                        atbat['start_out_base_state'] = str(events[-1]['end_outs']) + atbat['start_base_state']
+
+                                        ### pop home plate ###
+                                        events[-1].pop('start_', None)
                                         events[-1].pop('end_', None)
-                                        if 'score' in runner:
-                                            if atbat['inning_topbot'] == 'top':
-                                                runs['away_team_runs'] += 1
-                                                events[-1]['end_away_team_runs'] = runs['away_team_runs']
-                                                event['start_away_team_runs'] = runs['away_team_runs']
-                                                atbat['start_away_team_runs'] = runs['away_team_runs']
-                                            else:
-                                                runs['home_team_runs'] += 1
-                                                events[-1]['end_home_team_runs'] = runs['home_team_runs']
-                                                event['end_home_team_runs'] = runs['home_team_runs']
-                                                atbat['start_away_team_runs'] = runs['away_team_runs']
+                                        atbat.pop('start_', None)
+                                    else:
+                                        ### occurs at this atbat ###
+                                        bases[runner['end']] = runner['runner_id']
+                                        if bases[runner['start']] == runner['runner_id']:
+                                            bases[runner['start']] = None
 
                                 ### add base state ###
                                 base_state = get_base_state(bases)
@@ -248,13 +311,13 @@ def get_events(gid, retro_gid, game_pk, venue_id, game_date):
                             atbat['runners'] = runners
                             atbat['pickoffs'] = pickoffs
 
-                            ### get run changes from event ###
+                            ### get run changes from atbat ###
                             for run in runs:
-                                if run in event:
+                                if run in atbat:
                                     runs[run] = atbat[run]
                             outs = atbat['o']
 
-                            ### set end event values ###
+                            ### set end atbat values ###
                             base_state = get_base_state(bases)
                             out_base_state = str(outs) + base_state
                             atbat['end_base_state'] = base_state
@@ -306,8 +369,20 @@ def get_events(gid, retro_gid, game_pk, venue_id, game_date):
                         action = dict(event)
                         action['event_type'] = 'action'
                         action = download.get_attributes(action, node, 'action')
+                        if len(action['tfs_zulu']) == 20:
+                            action['tfs_zulu'] = dt.datetime.strptime(action['tfs_zulu'], '%Y-%m-%dT%H:%M:%SZ')
+                            action['datetime'] = get_local_time(action['tfs_zulu'], time_zone)
+                        else:
+                            action['tfs_zulu'] = None
+                            action['datetime'] = None
+                        ### get run changes from action ###
+                        for run in runs:
+                            if run in action:
+                                runs[run] = action[run]
+                        outs = action['o']
+
                         base_state = get_base_state(bases)
-                        action['end_outs'] = str(outs)
+                        action['end_outs'] = outs
                         action['end_base_state'] = base_state
                         action['end_out_base_state'] = str(outs) + base_state
                         for base in bases:
@@ -331,10 +406,10 @@ def get_game_models(game_date):
             objects.append(models.Coach(**coach))
         for umpire in players['umpires']:
             objects.append(models.Umpire(**umpire))
-        try:
-            events = get_events(game['gid'], game['retro_gid'], game['game_pk'], game['venue_id'], game_date)
-        except:
-            events = []
+        # try:
+        events = get_events(game['gid'], game['retro_gid'], game['game_pk'], game['venue_id'], game_date, game['home_time_zone'])
+        # except:
+        #     events = []
         for event in events:
             pitches = event.pop('pitches', None)
             if pitches is not None:
@@ -380,6 +455,9 @@ def get_trajectory_df(year):
     df['px'] = pd.to_numeric(df.px, errors = 'coerce')
     df = df[df.game_pk.notnull()]
     df.drop_duplicates(inplace = True)
+    df['year'] = df.game_date.year
+    df['month'] = df.game_date.month
+    df['day'] = df.game_date.day
     return df
 
 def get_game_log_df(year):
@@ -393,6 +471,9 @@ def get_game_log_df(year):
         df['game_date'] = df.game_date.astype(str)
         df['game_id'] = df.home_team_id + df.game_date + df.game_number.astype(str)
         df['game_date'] = pd.to_datetime(df.game_date, format = '%Y%m%d')
+        df['year'] = df.game_date.year
+        df['month'] = df.game_date.month
+        df['day'] = df.game_date.day
     else:
         df = pd.DataFrame()
     return df
@@ -434,6 +515,11 @@ def get_retro_event_df(year):
         df.columns = column_names
         df['home_team_id'] = df.game_id.str[:3]
         df['game_date'] = pd.to_datetime(df.game_id.str[3:11], format = '%Y%m%d')
+        df['year'] = df.game_date.year
+        df['month'] = df.game_date.month
+        df['day'] = df.game_date.day
+        df['event_cd_tx'] = df.event_cd.map(constants.RETRO_EVENT_CD)
+        df['event_cd_des'] = df.event_cd.map(constants.RETRO_EVENT_DES)
     else:
         df = pd.DataFrame()
 
@@ -500,8 +586,8 @@ def get_weather_data():
     session = database.get_session()
     engine = database.get_engine()
 
-    start_date_time = session.query(models.Weather.date_time).order_by\
-                            (models.Weather.date_time.desc()).first()
+    start_date_time = session.query(models.Weather.datetime).order_by\
+                            (models.Weather.datetime.desc()).first()
 
     if start_date_time is not None:
         start_date = start_date_time[0].date() + dt.timedelta(days = 1)
@@ -525,47 +611,86 @@ def get_weather_data():
         for row in gids:
             gid = row[0]
             venue = row[1]
-
             response = download.download_weather_table(gid, venue)
 
             date_str = gid[:11]
             park_id = venue_data[venue]['park_id']
 
-            data = []
-            matches = re.compile(r'<tr class="no-metars">(.*?)<\/tr>').findall(response)
-            for match in matches:
-                td = re.compile(r'.+?(?=<\/td>)').findall(match)
-                time_str = re.search(r'\d{2}:\d{2} [a-zA-Z]{2}', td[0])
-                if time_str is None:
-                    time_str = re.search(r'\d{1}:\d{2} [a-zA-Z]{2}', td[0]).group()
-                else:
-                    time_str = time_str.group()
-                date_time = dt.datetime.strptime(date_str + time_str, '%Y_%m_%d_%I:%M %p')
-                temperature = decimal_search(td[1])
-                heat_index = decimal_search(td[2])
-                dew_point = decimal_search(td[3])
-                humidity =decimal_search(td[4])
-                pressure = decimal_search(td[5])
-                visibility = decimal_search(td[6])
-                wind_dir_text = td[7].split('>')[-1].replace('\\n', '').replace(' ', '').replace('-', '')
-                if wind_dir_text in constants.WIND_DIR:
-                    wind_dir = constants.WIND_DIR[wind_dir_text]
-                else:
-                    wind_dir = None
-                wind_speed = decimal_search(td[8])
-                if wind_speed is None:
-                    wind_speed = decimal_search(td[8])
-                gust_speed = decimal_search(td[8])
-                if gust_speed is None:
-                    gust_speed = decimal_search(td[8])
-                precip = decimal_search(td[9])
+            weather_columns =  {'Time': None,
+                                'Temp': None,
+                                'Heat Index': None,
+                                'Dew Point': None,
+                                'Humidity': None,
+                                'Pressure': None,
+                                'Visibility': None,
+                                'Wind Dir': None,
+                                'Wind Speed': None,
+                                'Gust Speed': None,
+                                'Precip': None}
 
-                data.append([gid, venue, park_id, date_time, temperature, heat_index, dew_point, humidity, pressure, visibility, wind_dir, wind_speed, gust_speed, precip])
+            header = response.split('observations_details')
+            ### check for location weather observations ###
+            if len(header) > 1:
+                header = header[1].split('</tr')[0]
+                header = re.compile(r'<th>(.*?)<\/th>').findall(header)
 
-            columns = ['gid', 'venue_id', 'park_id', 'date_time', 'temperature', 'heat_index', 'dew_point', 'humidity', 'pressure', 'visibility', 'wind_dir', 'wind_speed', 'gust_speed', 'precipitation']
+                for column in weather_columns:
+                    for h, head in enumerate(header):
+                        if column in head:
+                            weather_columns[column] = h
+                            break
+                data = []
+                matches = re.compile(r'<tr class="no-metars">(.*?)<\/tr>').findall(response)
+                for match in matches:
+                    td = re.compile(r'.+?(?=<\/td>)').findall(match)
+                    time_str = re.search(r'\d{2}:\d{2} [a-zA-Z]{2}', td[weather_columns['Time']])
+                    if time_str is None:
+                        time_str = re.search(r'\d{1}:\d{2} [a-zA-Z]{2}', td[weather_columns['Time']]).group()
+                    else:
+                        time_str = time_str.group()
+                    date_time = dt.datetime.strptime(date_str + time_str, '%Y_%m_%d_%I:%M %p')
+                    temperature = decimal_search(td[weather_columns['Temp']])
+                    if weather_columns['Heat Index'] is not None:
+                        heat_index = decimal_search(td[2])
+                    else:
+                        heat_index = None
+                    dew_point = decimal_search(td[weather_columns['Dew Point']])
+                    humidity_search =  re.compile(r'\d{2}').findall(td[weather_columns['Humidity']])
+                    if len(humidity_search) > 0:
+                        humidity = humidity_search[0]
+                    else:
+                        humidity_search =  re.compile(r'\d{2}').findall(td[weather_columns['Humidity']])
+                        if len(humidity_search) > 0:
+                            humidity = humidity_search[0]
+                        else:
+                            humidity = None
+                    pressure = decimal_search(td[weather_columns['Pressure']])
+                    visibility = decimal_search(td[weather_columns['Visibility']])
+                    wind_dir_text = td[weather_columns['Wind Dir']].split('>')[-1].replace('\\n', '').replace(' ', '').replace('-', '')
+                    if wind_dir_text in constants.WIND_DIR:
+                        wind_dir = constants.WIND_DIR[wind_dir_text]
+                    else:
+                        wind_dir = None
+                    wind_speed = decimal_search(td[weather_columns['Wind Speed']])
+                    if wind_speed is None:
+                        wind_speed = 0
+                    gust_speed = decimal_search(td[weather_columns['Gust Speed']])
+                    if gust_speed is None:
+                        gust_speed = 0
+                    precip = decimal_search(td[weather_columns['Precip']])
 
-            game_df = pd.DataFrame(data, columns = columns).drop_duplicates(subset = ['gid', 'date_time'])
-            df = df.append(game_df)
+                    data.append([gid, venue, park_id, date_time, temperature, heat_index, dew_point, humidity, pressure, visibility, wind_dir, wind_speed, gust_speed, precip])
+
+                columns = ['gid', 'venue_id', 'park_id', 'datetime', 'temperature', 'heat_index', 'dew_point', 'humidity', 'pressure', 'visibility', 'wind_dir', 'wind_speed', 'gust_speed', 'precipitation']
+
+                game_df = pd.DataFrame(data, columns = columns).drop_duplicates(subset = ['gid', 'datetime'])
+                for i, row in game_df.iterrows():
+                    if row.wind_dir is None:
+                        if i == 0:
+                            game_df.iloc[i]['wind_dir'] = game_df.iloc[i + 1].wind_dir
+                        else:
+                            game_df.iloc[i]['wind_dir'] = game_df.iloc[i - 1].wind_dir
+                df = df.append(game_df)
         if len(df) > 0:
             df.loc[df.heat_index.isnull(), 'heat_index'] = df[df.heat_index.isnull()].temperature
             df.to_sql('weather', engine, if_exists = 'append', index = False)
