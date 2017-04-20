@@ -26,7 +26,7 @@ def update_gameday(delete_files = False):
         last_game_date = last_game_date[0] + dt.timedelta(days = 1)
     else:
         last_game_date = dt.date(2010,1,1)
-    l# ast_game_date = dt.date(2016,1,1) # debugging and testing
+    last_game_date = dt.date(2016, 1,1) # debugging and testing
 
     download.update_xml(start_date = last_game_date)
 
@@ -202,7 +202,6 @@ def update_event_keys():
                 filter(models.AtBat.retro_event_id == None).limit(1000).all()
 
     for row in events:
-        print row[0]
         row[0].retro_event_id = row[1]
     session.commit()
 
@@ -216,11 +215,9 @@ def update_event_keys():
                 filter(models.Pitch.inning == models.Event.inn_ct).\
                 filter(models.Pitch.retro_event_id == None).limit(1000)
 
-    print events
     events = events.all()
 
     for row in events:
-        print row[0]
         row[0].retro_event_id = row[1]
     session.commit()
 
@@ -230,7 +227,6 @@ def update_event_keys():
                 filter(models.Trajectory.retro_gid == None).limit(1000).all()
 
     for row in games:
-        print row[0]
         row[0].retro_gid = row[1]
     session.commit()
 
@@ -245,7 +241,6 @@ def update_event_keys():
                 filter(models.Trajectory.retro_event_id == None).limit(1000).all()
 
     for row in events:
-        print row[0]
         row[0].retro_event_id = row[1]
     session.commit()
 
